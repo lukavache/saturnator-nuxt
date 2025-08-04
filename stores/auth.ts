@@ -3,9 +3,14 @@ import storage from '../utils/storage'
 
 interface User {
   id: number
-  username: string
-  email: string
-  role: {
+  username?: string
+  email?: string
+  provider?: string
+  confirmed?: boolean
+  blocked?: boolean
+  createdAt?: string
+  updatedAt?: string
+  role?: {
     name: string
     type: string
   }
@@ -39,7 +44,10 @@ export const useAuthStore = defineStore('auth', {
         const { login } = useStrapiAuth()
         const response = await login(credentials)
         
-        this.user = response.user
+        const userData = response.user?.value || response.user
+        if (userData) {
+          this.user = userData as User
+        }
         this.token = response.jwt
         
         // Store in localStorage
@@ -79,9 +87,19 @@ export const useAuthStore = defineStore('auth', {
     async confirmEmail(confirmationToken: string) {
       this.loading = true
       try {
-        const { confirmEmail } = useStrapiAuth()
-        const response = await confirmEmail(confirmationToken)
-        return response
+        const config = useRuntimeConfig()
+        const strapiResponse = await fetch(
+          `${config.public.apiBase}/api/auth/email-confirmation?confirmation=${confirmationToken}`,
+          {
+            method: 'GET',
+            redirect: 'manual',
+          }
+        );
+        if(strapiResponse.status === 400) {
+          throw new Error(strapiResponse.statusText)
+        } else {
+          return strapiResponse
+        }
       } catch (error) {
         console.error('Email confirmation error:', error)
         throw error
@@ -93,8 +111,8 @@ export const useAuthStore = defineStore('auth', {
     async resendConfirmationEmail(email: string) {
       this.loading = true
       try {
-        const { resendConfirmationEmail } = useStrapiAuth()
-        const response = await resendConfirmationEmail({ email })
+        const { sendEmailConfirmation } = useStrapiAuth()
+        const response = await sendEmailConfirmation({ email })
         return response
       } catch (error) {
         console.error('Resend confirmation error:', error)

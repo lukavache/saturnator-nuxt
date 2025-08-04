@@ -148,7 +148,7 @@ const handleRegister = async () => {
     // Clear form
     form.value = {
       username: '',
-      email: '',
+      email: form.value.email,
       password: ''
     }
     
@@ -167,11 +167,6 @@ const handleRegister = async () => {
 }
 
 const resendConfirmation = async () => {
-  try {
-    await authStore.resendConfirmationEmail(form.value.email)
-    // Show success message
-  } catch (error) {
-    // Handle error
-  }
+  await navigateTo(`/confirm-email?email=${encodeURIComponent(form.value.email)}`)
 }
 </script> 

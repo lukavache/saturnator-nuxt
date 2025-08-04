@@ -103,8 +103,10 @@ const handleLogin = async () => {
     // Redirect to home page after successful login
     await navigateTo('/')
   } catch (err: any) {
-    console.error('Login error:', err)
     error.value = err.message || 'Login failed. Please check your credentials.'
+    if (err.error.message === 'Your account email is not confirmed') {
+      await navigateTo(`/confirm-email?email=${encodeURIComponent(form.value.email)}`)
+    }
   }
 }
 </script>

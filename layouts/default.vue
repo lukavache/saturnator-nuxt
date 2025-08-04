@@ -1,13 +1,13 @@
 <template>
   <div class="min-h-screen bg-saturnator-gray-light">
     <!-- Left Sidebar -->
-    <div class="fixed left-0 top-0 h-full w-24 bg-[#7F8CFF] border-r-2 border-black z-10"></div>
+    <div class="fixed left-0 top-0 h-full w-8 sm:w-16 md:w-24 bg-[#7F8CFF] border-r-2 border-black z-10"></div>
     
     <!-- Right Sidebar -->
-    <div class="fixed right-0 top-0 h-full w-24 bg-[#7F8CFF] border-l-2 border-black z-10"></div>
+    <div class="fixed right-0 top-0 h-full w-8 sm:w-16 md:w-24 bg-[#7F8CFF] border-l-2 border-black z-10"></div>
     
     <!-- Main Content Area -->
-    <div class="ml-24 mr-24">
+    <div class="ml-8 mr-8 sm:ml-16 sm:mr-16 md:ml-24 md:mr-24">
       <!-- Header -->
       <header class="bg-white border-b-2 border-black">
         <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,7 +15,8 @@
             <div class="flex">
               <!-- Logo -->
               <NuxtLink to="/" class="flex items-center">
-                <span class="text-2xl font-bold text-saturnator-gray-dark">Saturnator</span>
+                <img src="/saturnator-logo.png" alt="Saturnator Logo" class="h-6 w-10 sm:h-8 sm:w-14 mr-2 sm:mr-3" />
+                <span class="text-lg sm:text-xl md:text-2xl font-bold text-saturnator-gray-dark">Saturnator</span>
               </NuxtLink>
               
               <!-- Navigation Links -->
@@ -29,16 +30,16 @@
             <!-- Right side -->
             <div class="flex items-center">
               <!-- Language Switcher -->
-              <div class="mr-4">
-                <select v-model="currentLocale" class="bg-white border-2 border-black rounded-md px-3 py-1">
-                  <option value="en">English</option>
-                  <option value="ka">ქართული</option>
+              <div class="mr-2 sm:mr-4">
+                <select v-model="currentLocale" class="bg-white border-2 border-black rounded-md px-2 py-1 text-sm sm:text-base">
+                  <option value="en">EN</option>
+                  <option value="ka">KA</option>
                 </select>
               </div>
 
               <!-- Auth Section -->
               <div v-if="!authStore.isLoggedIn">
-                <NuxtLink to="/login" class="bg-white border-2 border-black rounded-md px-3 py-1">
+                <NuxtLink to="/login" class="bg-white border-2 border-black rounded-md px-2 py-1 text-sm sm:text-base">
                   Sign in
                 </NuxtLink>
               </div>

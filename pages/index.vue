@@ -38,11 +38,11 @@
           >
             <!-- Track Cover -->
             <div class="relative">
-              <div class="w-full h-32 bg-saturnator-gray-light overflow-hidden">
+              <div class="w-full h-32 sm:h-36 md:h-40 lg:h-48 bg-saturnator-gray-light overflow-hidden">
                 <img
                   :src="track.coverImage?.url ? `${strapiUrl}${track.coverImage.url}` : '/default-cover.jpg'"
                   :alt="track.title"
-                  class="w-full h-full object-cover mt-2"
+                  class="w-full h-full object-cover"
                   @error="handleImageError"
                 />
               </div>
@@ -53,7 +53,7 @@
             </div>
             
             <!-- Track Info -->
-            <div class="p-3">
+            <div class="p-2 sm:p-3">
               <h4 class="font-semibold text-saturnator-gray-dark text-sm mb-1 truncate">
                 {{ track.title }}
               </h4>

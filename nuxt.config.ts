@@ -51,5 +51,11 @@ export default defineNuxtConfig({
   // Build configuration
   build: {
     transpile: ['@nuxtjs/strapi']
+  },
+
+  routeRules: {
+    '/upload': {
+      ssr: false
+    }
   }
 })

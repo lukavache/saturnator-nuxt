@@ -28,39 +28,40 @@
           Latest Tracks
         </h3>
         
-        <!-- Horizontal Scrollable Track List -->
-        <div class="flex overflow-x-auto gap-4 pb-4 scrollbar-hide">
+        <!-- Grid Layout for Tracks -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <div
             v-for="track in tracks"
             :key="track.id"
-            class="flex-shrink-0 w-64 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+            @click="goToTrack(track.documentId)"
+            class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer transform hover:scale-105"
           >
-            <!-- Track Cover with Duration -->
+            <!-- Track Cover -->
             <div class="relative">
-              <div class="w-full h-48 bg-saturnator-gray-light rounded-t-lg overflow-hidden">
+              <div class="w-full h-32 bg-saturnator-gray-light overflow-hidden">
                 <img
-                  :src="track.coverImage"
+                  :src="track.coverImage?.url ? `${strapiUrl}${track.coverImage.url}` : '/default-cover.jpg'"
                   :alt="track.title"
-                  class="w-full h-full object-cover"
+                  class="w-full h-full object-cover mt-2"
                   @error="handleImageError"
                 />
               </div>
               <!-- Duration Badge -->
-              <div class="absolute top-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              <!-- <div class="absolute top-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1 py-0.5 rounded text-xs">
                 4:00
-              </div>
+              </div> -->
             </div>
             
             <!-- Track Info -->
-            <div class="p-4">
-              <h4 class="font-semibold text-saturnator-gray-dark mb-1">
+            <div class="p-3">
+              <h4 class="font-semibold text-saturnator-gray-dark text-sm mb-1 truncate">
                 {{ track.title }}
               </h4>
-              <p class="text-sm text-saturnator-gray-medium mb-1">
-                {{ track.artist }}
+              <p class="text-xs text-saturnator-gray-medium mb-1 truncate">
+                {{ track.username || track.users_permissions_user?.username || 'Unknown Artist' }}
               </p>
-              <p class="text-xs text-saturnator-gray-medium">
-                {{ track.genres?.[0] || 'Unknown Genre' }}
+              <p class="text-xs text-saturnator-gray-medium truncate">
+                {{ formatGenres(track.genres) }}
               </p>
             </div>
           </div>
@@ -68,15 +69,15 @@
           <!-- Loading Placeholders -->
           <template v-if="loading">
             <div
-              v-for="i in 8"
+              v-for="i in 10"
               :key="`placeholder-${i}`"
-              class="flex-shrink-0 w-64 bg-white rounded-lg shadow-sm animate-pulse"
+              class="bg-white rounded-lg shadow-sm animate-pulse overflow-hidden"
             >
-              <div class="w-full h-48 bg-saturnator-gray-light rounded-t-lg"></div>
-              <div class="p-4">
-                <div class="h-4 bg-saturnator-gray-light rounded mb-2"></div>
+              <div class="w-full h-32 bg-saturnator-gray-light"></div>
+              <div class="p-3">
                 <div class="h-3 bg-saturnator-gray-light rounded mb-1"></div>
-                <div class="h-3 bg-saturnator-gray-light rounded w-2/3"></div>
+                <div class="h-2 bg-saturnator-gray-light rounded mb-1"></div>
+                <div class="h-2 bg-saturnator-gray-light rounded w-2/3"></div>
               </div>
             </div>
           </template>
@@ -87,20 +88,6 @@
     <!-- User/Spotlight Section -->
     <section class="py-8 px-4">
       <div class="max-w-7xl mx-auto">
-        <!-- Section Headers -->
-        <!-- <div class="flex gap-4 mb-6">
-          <div class="flex-1 bg-gradient-to-r from-saturnator-purple-medium to-saturnator-purple-dark rounded-lg p-4">
-            <h3 class="text-white font-bold text-lg">
-              {{ authStore.getUser?.username || 'Username' }}
-            </h3>
-          </div>
-          <div class="flex-1 bg-gradient-to-r from-saturnator-blue-medium to-saturnator-blue-light rounded-lg p-4">
-            <h3 class="text-white font-bold text-lg">
-              Spotlight
-            </h3>
-          </div>
-        </div> -->
-        
         <!-- Content Area -->
         <div class="border-2 border-black p-8 min-h-64">
           <div class="text-center text-saturnator-gray-medium">
@@ -131,24 +118,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-
-// SEO
-definePageMeta({
-  title: 'Saturnator - Music Platform'
-})
-
-// Store
-const authStore = useAuthStore()
+import { ref, onMounted } from 'vue'
+import { useTrackStore } from '../stores/track'
 
 // Types
 interface Track {
-  id: string
-  title: string
-  artist: string
-  coverImage: string
-  genres: string[]
-  bpm: number
+  id: string;
+  documentId: string; // Strapi document ID
+  title: string;
+  username?: string;
+  coverImage?: {
+    url: string;
+    alternativeText?: string;
+    width?: number;
+    height?: number;
+  };
+  audioFile?: {
+    url: string;
+    alternativeText?: string;
+    width?: number;
+    height?: number;
+  };
+  samples?: Array<{
+    url: string;
+    alternativeText?: string;
+    width?: number;
+    height?: number;
+  }>;
+  genres?: any; // JSON field from Strapi
+  bpm?: number;
+  key?: string;
+  description?: string;
+  trackStatus?: 'pending' | 'approved' | 'rejected';
+  createdAt?: string;
+  updatedAt?: string;
+  users_permissions_user?: {
+    id: number;
+    username: string;
+    email: string;
+  };
 }
 
 // State
@@ -156,38 +164,64 @@ const tracks = ref<Track[]>([])
 const loading = ref(false)
 const hasMore = ref(true)
 const page = ref(1)
+const config = useRuntimeConfig()
+const strapiUrl = config.public.apiBase
 
 // Methods
+const goToTrack = (trackId: string) => {
+navigateTo(`/track/${trackId}`)
+}
+
+const formatGenres = (genres: any): string => {
+  if (!genres) return 'Unknown Genre'
+  
+  // Handle JSON field from Strapi
+  if (typeof genres === 'string') {
+    try {
+      const parsed = JSON.parse(genres)
+      return Array.isArray(parsed) ? parsed.join(', ') : parsed
+    } catch {
+      return genres
+    }
+  }
+  
+  if (Array.isArray(genres)) {
+    return genres.join(', ')
+  }
+  
+  return 'Unknown Genre'
+}
+
 const loadTracks = async () => {
   loading.value = true
   try {
-    const { find } = useStrapi()
-    const response = await find('tracks', {
+    const trackStore = useTrackStore()
+    const response = await trackStore.get({
       filters: {
-        status: 'approved'
+        trackStatus: { $eq: 'approved' }
       },
-      populate: ['coverImage', 'genres'],
+      populate: ['coverImage', 'users_permissions_user'],
       pagination: {
         page: page.value,
-        pageSize: 12
+        pageSize: 20
       },
-      sort: { createdAt: 'desc' }
+      sort: ['createdAt:desc']
     })
     
     console.log('Tracks response:', response)
+    console.log('Available track IDs:', response.data.map(track => track.id))
     
-    // Transform the response to match your Track interface
-    const newTracks = response.data.map((item: any) => ({
-      id: item.id,
-      title: item.attributes.title,
-      artist: item.attributes.artist,
-      coverImage: item.attributes.coverImage?.data?.attributes?.url || '/default-cover.jpg',
-      genres: item.attributes.genres?.data?.map((g: any) => g.attributes.name) || [],
-      bpm: item.attributes.bpm || 0
-    }))
+    // Add new tracks to existing ones for pagination
+    tracks.value = [...tracks.value, ...response.data]
     
-    tracks.value = [...tracks.value, ...newTracks]
-    hasMore.value = response.meta.pagination.page < response.meta.pagination.pageCount
+    // Check if there are more pages
+    const pagination = response.meta?.pagination
+    if (pagination && 'page' in pagination && 'pageCount' in pagination) {
+      hasMore.value = pagination.page < pagination.pageCount
+    } else {
+      hasMore.value = false
+    }
+    
   } catch (error) {
     console.error('Error loading tracks:', error)
   } finally {
@@ -209,22 +243,11 @@ const handleImageError = (event: Event) => {
 
 // Initial load
 onMounted(async () => {
-  await authStore.initializeAuth()
   loadTracks()
 })
 </script>
 
 <style scoped>
-/* Hide scrollbar for horizontal track list */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
 /* Custom animations */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -241,4 +264,4 @@ onMounted(async () => {
     opacity: 1;
   }
 }
-</style> 
+</style>

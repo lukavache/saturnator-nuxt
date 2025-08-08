@@ -6,7 +6,7 @@
         <h1 class="text-4xl font-bold text-saturnator-gray-dark mb-4">
           Share Your Music
         </h1>
-        <p class="text-lg text-saturnator-gray-medium mb-6">
+        <p class="text-lg text-saturnator-gray-medium">
           Upload your tracks and join the Saturnator community
         </p>
       </div>
@@ -33,21 +33,6 @@
                   placeholder="Enter track title"
                 />
               </div>
-
-              <!-- Artist Name -->
-              <div>
-                <label for="artist" class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
-                  Artist Name *
-                </label>
-                <input
-                  id="artist"
-                  v-model="form.artist"
-                  type="text"
-                  required
-                  class="w-full px-4 py-3 border border-saturnator-gray-light rounded-lg focus:ring-2 focus:ring-saturnator-blue-medium focus:border-saturnator-blue-medium transition-colors"
-                  placeholder="Enter artist name"
-                />
-              </div>
             </div>
 
             <!-- Description -->
@@ -65,16 +50,17 @@
             </div>
 
             <!-- Track Details -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <!-- BPM -->
               <div>
                 <label for="bpm" class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
-                  BPM
+                  BPM *
                 </label>
                 <input
                   id="bpm"
                   v-model.number="form.bpm"
                   type="number"
+                  required
                   min="1"
                   max="999"
                   class="w-full px-4 py-3 border border-saturnator-gray-light rounded-lg focus:ring-2 focus:ring-saturnator-blue-medium focus:border-saturnator-blue-medium transition-colors"
@@ -82,32 +68,19 @@
                 />
               </div>
 
-              <!-- Track Type -->
+              <!-- Track Key -->
               <div>
-                <label for="trackType" class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
-                  Track Type *
+                <label for="key" class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
+                  Track Key *
                 </label>
-                <select
-                  id="trackType"
-                  v-model="form.trackType"
+                <input
+                  id="key"
+                  v-model="form.key"
+                  type="text"
                   required
                   class="w-full px-4 py-3 border border-saturnator-gray-light rounded-lg focus:ring-2 focus:ring-saturnator-blue-medium focus:border-saturnator-blue-medium transition-colors"
-                >
-                  <option value="">Select track type</option>
-                  <option value="sample">Sample</option>
-                  <option value="track">Track</option>
-                  <option value="album">Album</option>
-                </select>
-              </div>
-
-              <!-- Status -->
-              <div>
-                <label class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
-                  Status
-                </label>
-                <div class="px-4 py-3 bg-saturnator-gray-light rounded-lg">
-                  <span class="text-saturnator-gray-medium">Pending Review</span>
-                </div>
+                  placeholder="Enter track key"
+                />
               </div>
             </div>
 
@@ -117,14 +90,14 @@
                 Genres *
               </label>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <label v-for="genre in genres" :key="genre.id" class="flex items-center p-3 border border-saturnator-gray-light rounded-lg hover:bg-saturnator-gray-light transition-colors">
+                <label v-for="genre in genreOptions" :key="genre" class="flex items-center p-3 border border-saturnator-gray-light rounded-lg hover:bg-saturnator-gray-light transition-colors">
                   <input
                     type="checkbox"
-                    :value="genre.id"
+                    :value="genre"
                     v-model="form.genres"
                     class="rounded border-saturnator-gray-medium text-saturnator-blue-medium focus:ring-saturnator-blue-medium"
                   />
-                  <span class="ml-3 text-sm text-saturnator-gray-dark">{{ genre.name }}</span>
+                  <span class="ml-3 text-sm text-saturnator-gray-dark">{{ genre }}</span>
                 </label>
               </div>
             </div>
@@ -193,6 +166,56 @@
               </div>
             </div>
 
+            <!-- Samples Upload -->
+            <div>
+              <label for="samples" class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
+                Samples (Optional)
+              </label>
+              <div class="border-2 border-dashed border-saturnator-gray-light rounded-lg p-6 text-center hover:border-saturnator-blue-medium transition-colors">
+                <input
+                  id="samples"
+                  ref="samplesInput"
+                  type="file"
+                  accept="audio/*"
+                  multiple
+                  @change="handleSamplesChange"
+                  class="hidden"
+                />
+                <label for="samples" class="cursor-pointer">
+                  <div class="text-saturnator-green-medium mb-2">
+                    <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                  </div>
+                  <p class="text-sm text-saturnator-gray-dark font-medium">
+                    {{ form.samples.length > 0 ? `${form.samples.length} file(s) selected` : 'Click to upload sample files' }}
+                  </p>
+                  <p class="text-xs text-saturnator-gray-medium mt-1">
+                    MP3, WAV, FLAC (max 50MB each)
+                  </p>
+                </label>
+              </div>
+              
+              <!-- Selected Samples List -->
+              <div v-if="form.samples.length > 0" class="mt-4">
+                <h4 class="text-sm font-semibold text-saturnator-gray-dark mb-2">Selected Samples:</h4>
+                <div class="space-y-2">
+                  <div v-for="(sample, index) in form.samples" :key="index" class="flex items-center justify-between p-3 bg-saturnator-gray-light rounded-lg">
+                    <span class="text-sm text-saturnator-gray-dark">{{ sample.name }}</span>
+                    <button 
+                      type="button"
+                      @click="removeSample(index)"
+                      class="text-red-500 hover:text-red-700"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Messages -->
             <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
               <p class="text-red-600 text-sm">{{ error }}</p>
@@ -207,10 +230,10 @@
               <button
                 type="submit"
                 :disabled="loading"
-                class="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-saturnator-blue-medium hover:bg-saturnator-blue-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-saturnator-blue-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                class="inline-flex items-center px-8 py-3 border-2 border-black rounded-lg text-base font-medium bg-white hover:bg-saturnator-gray-light focus:ring-2 focus:ring-saturnator-blue-medium focus:border-saturnator-blue-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 <span v-if="loading" class="mr-2">
-                  <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
                 </span>
                 {{ loading ? 'Uploading...' : 'Upload Track' }}
               </button>
@@ -233,44 +256,79 @@ definePageMeta({
 
 // Store
 const authStore = useAuthStore()
+const uploadStore = useUploadStore()
+const config = useRuntimeConfig()
+const strapiUrl = config.public.apiBase
+
+const genreOptions = [
+  'Electronic',
+  'Hip Hop', 
+  'Rock',
+  'Pop',
+  'Jazz',
+  'Classical',
+  'Country',
+  'R&B',
+  'Reggae',
+  'Metal',
+  'Folk',
+  'Blues',
+  'Punk',
+  'Indie',
+  'Ambient',
+  'Techno',
+  'House',
+  'Drum & Bass',
+  'Trap',
+  'Lo-Fi',
+  'Experimental',
+  'Soundtrack',
+  'World Music',
+  'Gospel',
+  'Soul',
+  'Other'
+]
 
 // Form state
 const form = ref({
   title: '',
   description: '',
-  artist: '',
   genres: [] as string[],
   bpm: null as number | null,
-  trackType: '',
+  key: '',
   audioFile: null as File | null,
+  samples: [] as File[],
   coverImage: null as File | null
 })
 
-const genres = ref<any[]>([])
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
 
 // File input refs
 const audioFileInput = ref<HTMLInputElement>()
+const samplesInput = ref<HTMLInputElement>()
 const coverImageInput = ref<HTMLInputElement>()
 
 // Methods
-const loadGenres = async () => {
-  try {
-    const { find } = useStrapi()
-    const response = await find('genres')
-    genres.value = response.data
-  } catch (err) {
-    console.error('Error loading genres:', err)
-  }
-}
-
 const handleAudioFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
     form.value.audioFile = target.files[0]
   }
+}
+
+const handleSamplesChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files) {
+    // Convert FileList to Array and add to existing samples
+    const newFiles = Array.from(target.files)
+    form.value.samples = [...form.value.samples, ...newFiles]
+  }
+}
+
+const removeSample = (index: number) => {
+  form.value.samples.splice(index, 1)
 }
 
 const handleCoverImageChange = (event: Event) => {
@@ -284,50 +342,81 @@ const handleSubmit = async () => {
   loading.value = true
   error.value = ''
   success.value = ''
-  
+
   try {
-    // Create FormData for file upload
-    const formData = new FormData()
-    formData.append('data', JSON.stringify({
-      title: form.value.title,
-      description: form.value.description,
-      artist: form.value.artist,
-      genres: form.value.genres,
-      bpm: form.value.bpm,
-      trackType: form.value.trackType,
-      status: 'pending'
-    }))
+    // STEP 1: Upload files first
+    const uploadPromises: number[] = []
     
     if (form.value.audioFile) {
-      formData.append('files.audioFile', form.value.audioFile)
+      const audioResult = await uploadStore.uploadFile(form.value.audioFile)
+      uploadPromises.push(audioResult[0].id)
     }
-    
+
     if (form.value.coverImage) {
-      formData.append('files.coverImage', form.value.coverImage)
+      const imageResult = await uploadStore.uploadFile(form.value.coverImage)
+      uploadPromises.push(imageResult[0].id)
     }
-    
-    // Submit to Strapi
-    const { create } = useStrapi()
-    await create('tracks', formData)
-    
+
+    // Upload samples if any
+    if (form.value.samples.length > 0) {
+      const samplesResult = await uploadStore.uploadMultipleFiles(form.value.samples)
+      
+      // Add all sample IDs to uploadPromises
+      samplesResult.forEach((file: any) => {
+        uploadPromises.push(file.id)
+      })
+    }
+
+    // STEP 2: Create track with file IDs
+    const trackData: any = {
+      title: form.value.title,
+      description: form.value.description,
+      bpm: form.value.bpm,
+      key: form.value.key,
+      trackStatus: 'pending',
+      username: authStore.getUser?.username
+    }
+
+    // Add file IDs to the track data
+    if (uploadPromises.length > 0) {
+      if (form.value.audioFile) {
+        trackData.audioFile = uploadPromises[0] // First uploaded file
+      }
+      if (form.value.coverImage) {
+        trackData.coverImage = uploadPromises[1] || uploadPromises[0] // Second uploaded file or first if only one
+      }
+      if (form.value.samples.length > 0) {
+        // Add sample IDs starting from the appropriate index
+        const sampleStartIndex = (form.value.audioFile ? 1 : 0) + (form.value.coverImage ? 1 : 0)
+        trackData.samples = uploadPromises.slice(sampleStartIndex)
+      }
+    }
+
+    // Add genres if selected - send as JSON array
+    if (form.value.genres && form.value.genres.length > 0) {
+      trackData.genres = form.value.genres // Send as array directly
+    }
+
+    const created = await uploadStore.createTrack(trackData)
+
     success.value = 'Track uploaded successfully! It will be reviewed by our team.'
-    
+
     // Reset form
     form.value = {
       title: '',
       description: '',
-      artist: '',
       genres: [],
       bpm: null,
-      trackType: '',
+      key: '',
       audioFile: null,
+      samples: [],
       coverImage: null
     }
-    
-    // Reset file inputs
+
     if (audioFileInput.value) audioFileInput.value.value = ''
+    if (samplesInput.value) samplesInput.value.value = ''
     if (coverImageInput.value) coverImageInput.value.value = ''
-    
+
   } catch (err: any) {
     console.error('Upload error:', err)
     error.value = err.message || 'Upload failed. Please try again.'
@@ -336,18 +425,14 @@ const handleSubmit = async () => {
   }
 }
 
-// Load genres on mount
-onMounted(async () => {
-  // Ensure auth is initialized
-  await authStore.initializeAuth()
+// Initial load
+// onMounted(async () => {
+//   await authStore.initializeAuth()
   
-  // Check if user is logged in
-  if (!authStore.isLoggedIn) {
-    await navigateTo('/login')
-    return
-  }
-  
-  // Load genres
-  await loadGenres()
-})
+//   // Check if user is logged in
+//   if (!authStore.isLoggedIn) {
+//     await navigateTo('/login')
+//     return
+//   }
+// })
 </script> 

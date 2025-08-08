@@ -20,11 +20,15 @@
               </NuxtLink>
               
               <!-- Navigation Links -->
-              <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <NuxtLink v-if="authStore.isLoggedIn" to="/upload" class="text-saturnator-gray-dark inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-saturnator-blue-medium">
-                  Upload
-                </NuxtLink>
-              </div>
+              <ClientOnly>
+                <template #default>
+                  <div v-if="authStore.isLoggedIn" class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                    <NuxtLink to="/upload" class="text-saturnator-gray-dark inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-saturnator-blue-medium">
+                      Upload
+                    </NuxtLink>
+                  </div>
+                </template>
+              </ClientOnly>
             </div>
 
             <!-- Right side -->
@@ -38,37 +42,41 @@
               </div>
 
               <!-- Auth Section -->
-              <div v-if="!authStore.isLoggedIn">
-                <NuxtLink to="/login" class="bg-white border-2 border-black rounded-md px-2 py-1 text-sm sm:text-base">
-                  Sign in
-                </NuxtLink>
-              </div>
-
-              <!-- User Menu -->
-              <div v-else class="relative">
-                <button
-                  @click="userMenuOpen = !userMenuOpen"
-                  class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-saturnator-blue-medium"
-                >
-                  <span class="text-saturnator-gray-dark">{{ authStore.getUser?.username }}</span>
-                  <svg class="ml-2 h-4 w-4 text-saturnator-gray-medium" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                </button>
-
-                <!-- Dropdown Menu -->
-                <div
-                  v-if="userMenuOpen"
-                  class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border-2 border-black"
-                >
-                  <button
-                    @click="handleLogout"
-                    class="block w-full text-left px-4 py-2 text-sm text-saturnator-gray-dark hover:bg-saturnator-gray-light"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              </div>
+              <ClientOnly>
+                <template #default>
+                  <div v-if="!authStore.isLoggedIn">
+                    <NuxtLink to="/login" class="bg-white border-2 border-black rounded-md px-2 py-1 text-sm sm:text-base">
+                      Sign in
+                    </NuxtLink>
+                  </div>
+                  
+                  <!-- User Menu -->
+                  <div v-else class="relative">
+                    <button
+                      @click="userMenuOpen = !userMenuOpen"
+                      class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-saturnator-blue-medium"
+                    >
+                      <span class="text-saturnator-gray-dark">{{ authStore.getUser?.username }}</span>
+                      <svg class="ml-2 h-4 w-4 text-saturnator-gray-medium" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                    </button>
+                  
+                    <!-- Dropdown Menu -->
+                    <div
+                      v-if="userMenuOpen"
+                      class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border-2 border-black"
+                    >
+                      <button
+                        @click="handleLogout"
+                        class="block w-full text-left px-4 py-2 text-sm text-saturnator-gray-dark hover:bg-saturnator-gray-light"
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </ClientOnly>
             </div>
           </div>
         </nav>
@@ -118,13 +126,7 @@ const handleLogout = async () => {
 }
 
 // Close user menu when clicking outside
-onMounted(() => {
-  console.log('Default layout mounted')
-  console.log('Auth state:', {
-    isLoggedIn: authStore.isLoggedIn,
-    user: authStore.getUser,
-    token: authStore.getToken
-  })
+onMounted(async () => {
   document.addEventListener('click', (event) => {
     const target = event.target as Element
     if (!target.closest('.relative')) {

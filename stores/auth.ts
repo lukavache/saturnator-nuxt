@@ -126,13 +126,13 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { logout } = useStrapiAuth()
         await logout()
+        return true
       } catch (error) {
         console.error('Logout error:', error)
+        return false
       } finally {
         this.user = null
         this.token = null
-        
-        // Clear localStorage
         storage.removeItems(['auth_token', 'auth_user'])
       }
     },
@@ -156,29 +156,22 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async initializeAuth() {
-      if (process.client) {
-        const token = storage.get('auth_token')
-        const userData = storage.get('auth_user')
-        
-        console.log('Initializing auth:', { token: !!token, userData: !!userData })
-        
-        if (token && userData) {
-          try {
-            this.token = token
-            this.user = JSON.parse(userData)
-            
-            console.log('Auth state restored:', {
-              user: this.user,
-              token: this.token,
-              isLoggedIn: this.isLoggedIn
-            })
-            
-            // Verify token is still valid
+      // Always try to initialize, not just on client
+      const token = storage.get('auth_token')
+      const userData = storage.get('auth_user')
+      
+      if (token && userData) {
+        try {
+          this.token = token
+          this.user = JSON.parse(userData) as User
+          
+          // Only fetch user on client side to avoid SSR issues
+          if (process.client) {
             await this.fetchUser()
-          } catch (error) {
-            console.error('Token validation error:', error)
-            this.logout()
           }
+        } catch (error) {
+          console.error('Token validation error:', error)
+          this.logout()
         }
       }
     },

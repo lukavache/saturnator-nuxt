@@ -27,7 +27,7 @@
             <div class="md:col-span-1">
               <div class="w-48 h-48 md:w-full md:h-auto mx-auto md:mx-0 aspect-square bg-saturnator-gray-light rounded-lg overflow-hidden">
                 <img
-                  :src="track.coverImage?.url ? `${strapiUrl}${track.coverImage.url}` : '/default-cover.jpg'"
+                  :src="track.coverImage?.url ? assetUrl(track.coverImage.url) : '/default-cover.jpg'"
                   :alt="track.title"
                   class="w-full h-full object-cover"
                   @error="handleImageError"
@@ -95,7 +95,7 @@
             <div class="bg-saturnator-gray-light rounded-lg p-6">
               <audio 
                 v-if="track.audioFile?.url"
-                :src="`${strapiUrl}${track.audioFile.url}`"
+                :src="assetUrl(track.audioFile.url)"
                 controls
                 class="w-full"
                 preload="metadata"
@@ -123,7 +123,7 @@
                     Sample {{ index + 1 }}
                   </h3>
                   <audio 
-                    :src="`${strapiUrl}${sample.url}`"
+                    :src="assetUrl(sample.url)"
                     controls
                     class="w-full"
                     preload="metadata"
@@ -167,8 +167,13 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 const trackId = route.params.id as string
 const config = useRuntimeConfig()
-const strapiUrl = config.public.apiBase
 
+const assetUrl = (url?: string) => {
+  if (!url) return ''
+  return url.startsWith('http')
+    ? url
+    : `${config.public.apiBase}${url}`  // for local/relative URLs
+}
 // Types
 interface Track {
   id: string;

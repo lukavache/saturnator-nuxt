@@ -40,7 +40,7 @@
             <div class="relative">
               <div class="w-full h-32 sm:h-36 md:h-40 lg:h-48 bg-saturnator-gray-light overflow-hidden">
                 <img
-                  :src="track.coverImage?.url ? `${strapiUrl}${track.coverImage.url}` : '/default-cover.jpg'"
+                  :src="track.coverImage?.url ? assetUrl(track.coverImage.url) : '/default-cover.jpg'"
                   :alt="track.title"
                   class="w-full h-full object-cover"
                   @error="handleImageError"
@@ -165,7 +165,13 @@ const loading = ref(false)
 const hasMore = ref(true)
 const page = ref(1)
 const config = useRuntimeConfig()
-const strapiUrl = config.public.apiBase
+
+const assetUrl = (url?: string) => {
+  if (!url) return ''
+  return url.startsWith('http')
+    ? url
+    : `${config.public.apiBase}${url}`  // for local/relative URLs
+}
 
 // Methods
 const goToTrack = (trackId: string) => {

@@ -143,7 +143,7 @@
             <!-- Center - Search Bar -->
             <div class="flex-1 max-w-2xl mx-4 sm:mx-8">
               <div class="relative">
-                <img src="/Search bar.png" alt="Search" class="w-full h-10 object-contain" />
+                <img src="/search-bar.png" alt="Search" class="w-full h-10 object-contain" />
                 <input
                   type="text"
                   placeholder=""
@@ -210,12 +210,12 @@
 
               <!-- Likes/Star Button -->
               <button class="p-2 border border-black rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
-                <img src="/Star for likes.png" alt="Likes" class="h-5 w-5 object-contain" />
+                <img src="/star-for-likes.png" alt="Likes" class="h-5 w-5 object-contain" />
               </button>
 
               <!-- Shopping Cart Icon -->
               <button class="p-2 border border-black rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
-                <img src="/Shopping cart.png" alt="Shopping Cart" class="h-5 w-5 object-contain" />
+                <img src="/shopping-cart.png" alt="Shopping Cart" class="h-5 w-5 object-contain" />
               </button>
 
               <!-- Hamburger Menu Icon -->
@@ -223,7 +223,7 @@
                 @click="toggleSidebar"
                 class="p-2 border border-black rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
               >
-                <img src="/Hamburger button.png" alt="Menu" class="h-5 w-5 object-contain" />
+                <img src="/hamburger-button.png" alt="Menu" class="h-5 w-5 object-contain" />
               </button>
             </div>
           </div>

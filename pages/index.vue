@@ -214,9 +214,6 @@ const loadTracks = async () => {
       sort: ['createdAt:desc']
     })
     
-    console.log('Tracks response:', response)
-    console.log('Available track IDs:', response.data.map(track => track.id))
-    
     // Add new tracks to existing ones for pagination
     tracks.value = [...tracks.value, ...response.data]
     

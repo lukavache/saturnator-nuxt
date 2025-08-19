@@ -39,9 +39,17 @@
             <div class="md:col-span-3">
               <!-- Title and Artist on one line -->
               <div class="flex items-center justify-between mb-6">
+                <!-- Title -->
                 <h1 class="text-3xl font-bold text-saturnator-gray-dark">
                   {{ track.title }}
                 </h1>
+                <!-- Like Button -->
+                <LikeButton 
+                    :track-id="parseInt(track.id)" 
+                    :track-doc-id="track.documentId" 
+                    :like-count="track.likes?.length || 0" 
+                  />
+                <!-- Artist -->
                 <p class="text-lg text-saturnator-gray-medium text-right">
                   Artist: {{ track.username || track.users_permissions_user?.username || 'Unknown Artist' }}
                 </p>
@@ -210,6 +218,11 @@ interface Track {
     username: string;
     email: string;
   };
+  likes?: Array<{
+    id: number;
+    track: string;
+    user: string;
+  }>;
 }
 
 // State

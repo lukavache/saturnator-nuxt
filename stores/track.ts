@@ -23,7 +23,7 @@ export const useTrackStore = defineStore("Track", () => {
   };
 
   const getById = async (id: string, opt: Strapi4RequestParams = { 
-    populate: ["coverImage", "users_permissions_user", "audioFile", "samples"] 
+    populate: ["coverImage", "users_permissions_user", "audioFile", "samples", "likes"] 
   }) => {
     const res = await client<FindOne<Track>>(`${endpoint}/${id}`, {
       method: "GET",

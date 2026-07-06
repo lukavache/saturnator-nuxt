@@ -1,148 +1,191 @@
 <template>
   <div class="min-h-screen bg-saturnator-gray-light">
     <!-- Loading State -->
-    <div v-if="loading" class="flex items-center justify-center min-h-screen">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-saturnator-blue-medium"></div>
+    <div v-if="loading" class="flex min-h-[60vh] items-center justify-center">
+      <div class="h-12 w-12 animate-spin rounded-full border-4 border-saturnator-gray-light border-b-saturnator-blue-medium"></div>
     </div>
 
     <!-- Track Details -->
-    <div v-else-if="track" class="py-8 px-4">
-      <div class="max-w-4xl mx-auto">
-        <!-- Back Button -->
+    <div v-else-if="track" class="px-4 py-8 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl">
         <button 
           @click="goBack"
-          class="mb-6 flex items-center text-saturnator-gray-medium hover:text-saturnator-gray-dark transition-colors"
+          class="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-saturnator-gray-dark transition-colors hover:text-saturnator-blue-medium"
         >
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
           </svg>
           Back to Tracks
         </button>
 
-        <!-- Main Track Card -->
-        <div class="bg-white rounded-lg shadow-sm p-8">
-          <!-- Track Info Section -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <!-- Cover Image -->
-            <div class="md:col-span-1">
-              <div class="w-48 h-48 md:w-full md:h-auto mx-auto md:mx-0 aspect-square bg-saturnator-gray-light rounded-lg overflow-hidden">
-                <img
-                  :src="track.coverImage?.url ? assetUrl(track.coverImage.url) : '/default-cover.jpg'"
-                  :alt="track.title"
-                  class="w-full h-full object-cover"
-                  @error="handleImageError"
-                />
-              </div>
-            </div>
-
-            <!-- Track Info -->
-            <div class="md:col-span-3">
-              <!-- Title and Artist on one line -->
-              <div class="flex items-center justify-between mb-6">
-                <!-- Title -->
-                <h1 class="text-3xl font-bold text-saturnator-gray-dark">
-                  {{ track.title }}
-                </h1>
-                <!-- Like Button -->
-                <LikeButton 
-                    :track-id="parseInt(track.id)" 
-                    :track-doc-id="track.documentId" 
-                    :like-count="track.likes?.length || 0" 
+        <article class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
+          <div class="grid gap-0 lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.6fr)]">
+            <aside class="border-b-2 border-black bg-[#eef0ff] p-5 sm:p-8 lg:border-b-0 lg:border-r-2">
+              <div class="mx-auto max-w-sm">
+                <div class="aspect-square overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
+                  <img
+                    :src="coverUrl"
+                    :alt="track.title"
+                    class="h-full w-full object-cover"
+                    @error="handleImageError"
                   />
-                <!-- Artist -->
-                <p class="text-lg text-saturnator-gray-medium text-right">
-                  Artist: {{ track.username || track.users_permissions_user?.username || 'Unknown Artist' }}
-                </p>
-              </div>
-
-              <!-- Genres, BPM, Key on one line -->
-              <div class="flex flex-wrap justify-between mb-6">
-                <div>
-                  <h3 class="text-sm font-semibold text-saturnator-gray-medium uppercase tracking-wide mb-1">
-                    Genres
-                  </h3>
-                  <p class="text-lg text-saturnator-gray-dark">
-                    {{ formatGenres(track.genres) }}
-                  </p>
                 </div>
-                <div class="flex flex-row gap-10 text-right">
-                  <div>
-                    <h3 class="text-sm font-semibold text-saturnator-gray-medium uppercase tracking-wide mb-1">
-                      BPM
-                    </h3>
-                    <p class="text-lg text-saturnator-gray-dark">
-                      {{ track.bpm }}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 class="text-sm font-semibold text-saturnator-gray-medium uppercase tracking-wide mb-1">
-                      Key
-                    </h3>
-                    <p class="text-lg text-saturnator-gray-dark">
-                      {{ track.key }}
-                    </p>
+
+                <div class="mt-5 rounded-lg border-2 border-black bg-white p-4">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-xs font-bold uppercase tracking-wide text-saturnator-gray-medium">
+                        Artist
+                      </p>
+                      <p class="mt-1 text-lg font-bold text-saturnator-gray-dark">
+                        {{ artistName }}
+                      </p>
+                    </div>
+                    <LikeButton 
+                      :track-id="Number(track.id)" 
+                      :track-doc-id="track.documentId" 
+                      :like-count="likeCount"
+                      @update:like-count="updateLikeCount"
+                    />
                   </div>
                 </div>
               </div>
+            </aside>
 
-              <!-- Description -->
-              <div v-if="track.description">
-                <h3 class="text-sm font-semibold text-saturnator-gray-medium uppercase tracking-wide mb-2">
-                  Description
-                </h3>
-                <p class="text-lg text-saturnator-gray-dark leading-relaxed">
-                  {{ track.description }}
-                </p>
-              </div>
-            </div>
-          </div>
+            <section class="p-5 sm:p-8">
+              <div class="flex flex-col gap-5">
+                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div class="min-w-0">
+                    <div class="mb-3 flex flex-wrap items-center gap-2">
+                      <span class="rounded-full border border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-saturnator-gray-dark">
+                        {{ track.trackStatus || 'approved' }}
+                      </span>
+                      <span v-if="track.createdAt" class="text-sm font-medium text-saturnator-gray-medium">
+                        {{ formatDate(track.createdAt) }}
+                      </span>
+                    </div>
 
-          <!-- Audio and Samples Section -->
-          <div>
-            <!-- Main Audio Player -->
-            <div class="bg-saturnator-gray-light rounded-lg p-6">
-              <audio 
-                v-if="track.audioFile?.url"
-                :src="assetUrl(track.audioFile.url)"
-                controls
-                class="w-full"
-                preload="metadata"
-              >
-                Your browser does not support the audio element.
-              </audio>
-              <p v-else class="text-saturnator-gray-medium text-center py-8">
-                Audio file not available
-              </p>
-            </div>
+                    <h1 class="break-words text-4xl font-black leading-tight text-saturnator-gray-dark sm:text-5xl">
+                      {{ track.title }}
+                    </h1>
 
-            <!-- Samples Section -->
-            <div v-if="track.samples && track.samples.length > 0">
-              <h2 class="text-xl font-bold text-saturnator-gray-dark">
-                Samples
-              </h2>
-              
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <div 
-                  v-for="(sample, index) in track.samples" 
-                  :key="index"
-                  class="bg-saturnator-gray-light rounded-lg p-4 min-w-0"
-                >
-                  <h3 class="font-semibold text-saturnator-gray-dark mb-2">
-                    Sample {{ index + 1 }}
-                  </h3>
+                    <p class="mt-3 text-lg font-semibold text-saturnator-gray-medium">
+                      by {{ artistName }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="rounded-lg border-2 border-black bg-saturnator-gray-light p-4">
+                  <div class="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-xs font-bold uppercase tracking-wide text-saturnator-gray-medium">
+                        Now Playing
+                      </p>
+                      <p class="font-bold text-saturnator-gray-dark">
+                        {{ track.title }}
+                      </p>
+                    </div>
+                  </div>
                   <audio 
-                    :src="assetUrl(sample.url)"
+                    v-if="track.audioFile?.url"
+                    :src="assetUrl(track.audioFile.url)"
                     controls
                     class="w-full"
                     preload="metadata"
                   >
                     Your browser does not support the audio element.
                   </audio>
+                  <p v-else class="py-5 text-center font-medium text-saturnator-gray-medium">
+                    Audio file not available
+                  </p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div class="rounded-lg border border-black bg-white p-4">
+                    <p class="text-xs font-bold uppercase tracking-wide text-saturnator-gray-medium">
+                      BPM
+                    </p>
+                    <p class="mt-2 text-2xl font-black text-saturnator-gray-dark">
+                      {{ track.bpm || 'N/A' }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg border border-black bg-white p-4">
+                    <p class="text-xs font-bold uppercase tracking-wide text-saturnator-gray-medium">
+                      Key
+                    </p>
+                    <p class="mt-2 text-2xl font-black text-saturnator-gray-dark">
+                      {{ track.key || 'N/A' }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg border border-black bg-white p-4 sm:col-span-2">
+                    <p class="text-xs font-bold uppercase tracking-wide text-saturnator-gray-medium">
+                      Genres
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <span
+                        v-for="genre in genreTags"
+                        :key="genre"
+                        class="rounded-full bg-saturnator-gray-light px-3 py-1 text-sm font-semibold text-saturnator-gray-dark"
+                      >
+                        {{ genre }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="track.description" class="border-t-2 border-black pt-6">
+                  <h2 class="text-sm font-bold uppercase tracking-wide text-saturnator-gray-medium">
+                    Description
+                  </h2>
+                  <p class="mt-3 whitespace-pre-line text-lg leading-relaxed text-saturnator-gray-dark">
+                    {{ track.description }}
+                  </p>
                 </div>
               </div>
-            </div>
+            </section>
           </div>
-        </div>
+
+          <section v-if="track.samples && track.samples.length > 0" class="border-t-2 border-black p-5 sm:p-8">
+            <div class="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-black text-saturnator-gray-dark">
+                  Samples
+                </h2>
+                <p class="mt-1 text-sm font-medium text-saturnator-gray-medium">
+                  Extra audio included with this track.
+                </p>
+              </div>
+              <span class="rounded-full border border-black px-3 py-1 text-sm font-bold text-saturnator-gray-dark">
+                {{ track.samples.length }}
+              </span>
+            </div>
+            
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div 
+                v-for="(sample, index) in track.samples" 
+                :key="sample.url || index"
+                class="rounded-lg border border-black bg-white p-4"
+              >
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h3 class="font-bold text-saturnator-gray-dark">
+                    {{ sample.name || `Sample ${index + 1}` }}
+                  </h3>
+                  <span class="text-xs font-bold text-saturnator-gray-medium">
+                    {{ index + 1 }}
+                  </span>
+                </div>
+                <audio 
+                  :src="assetUrl(sample.url)"
+                  controls
+                  class="w-full"
+                  preload="metadata"
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            </div>
+          </section>
+        </article>
       </div>
     </div>
 
@@ -167,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useTrackStore } from '../../stores/track'
 import { useRoute } from 'vue-router'
 
@@ -201,6 +244,7 @@ interface Track {
     height?: number;
   };
   samples?: Array<{
+    name?: string;
     url: string;
     alternativeText?: string;
     width?: number;
@@ -229,26 +273,47 @@ interface Track {
 const track = ref<Track | null>(null)
 const loading = ref(true)
 const error = ref('')
+const likeCount = ref(0)
 
-// Methods
-const formatGenres = (genres: any): string => {
-  if (!genres) return 'Unknown Genre'
-  
-  // Handle JSON field from Strapi
+const artistName = computed(() => {
+  return track.value?.username || track.value?.users_permissions_user?.username || 'Unknown Artist'
+})
+
+const coverUrl = computed(() => {
+  return track.value?.coverImage?.url ? assetUrl(track.value.coverImage.url) : '/default-cover.jpg'
+})
+
+const genreTags = computed(() => {
+  const genres = track.value?.genres
+  if (!genres) return ['Unknown Genre']
+
   if (typeof genres === 'string') {
     try {
       const parsed = JSON.parse(genres)
-      return Array.isArray(parsed) ? parsed.join(', ') : parsed
+      return Array.isArray(parsed) ? parsed : [parsed]
     } catch {
-      return genres
+      return genres.split(',').map((genre) => genre.trim()).filter(Boolean)
     }
   }
-  
+
   if (Array.isArray(genres)) {
-    return genres.join(', ')
+    return genres.length > 0 ? genres : ['Unknown Genre']
   }
-  
-  return 'Unknown Genre'
+
+  return ['Unknown Genre']
+})
+
+// Methods
+const formatDate = (date: string) => {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(new Date(date))
+}
+
+const updateLikeCount = (count: number) => {
+  likeCount.value = count
 }
 
 const loadTrack = async () => {
@@ -256,12 +321,11 @@ const loadTrack = async () => {
   error.value = ''
   
   try {
-    console.log('Loading track with ID:', trackId)
-    
     const trackStore = useTrackStore()
     const response = await trackStore.getById(route.params.id as string)
     
     track.value = response.data
+    likeCount.value = response.data.likes?.length || 0
     
   } catch (err: any) {
     console.error('Error loading track:', err)

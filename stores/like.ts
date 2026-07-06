@@ -15,6 +15,17 @@ export const useLikeStore = defineStore("Like", () => {
   const records = ref<Like[]>([]);
   const userLikes = ref<Set<string>>(new Set()); // Track documentIds
 
+  const ensureUserId = async () => {
+    const auth = useAuthStore();
+    if (!auth.isLoggedIn) return null;
+
+    if (!auth.getUser?.id) {
+      await auth.fetchUser();
+    }
+
+    return auth.getUser?.id ?? null;
+  };
+
   const get = async (opts: Strapi4RequestParams = {}) => {
     const res = await client<FindMany<Like>>(endpoint, {
       method: "GET",
@@ -25,8 +36,8 @@ export const useLikeStore = defineStore("Like", () => {
   };
 
   const create = async (data: { trackId?: number; trackDocId?: string }) => {
-    const auth = useAuthStore();
-    if (!auth.isLoggedIn) return null;
+    const userId = await ensureUserId();
+    if (!userId) return null;
 
     // Validate that we have a valid trackDocId
     if (!data.trackDocId || data.trackDocId.trim() === '') {
@@ -38,13 +49,12 @@ export const useLikeStore = defineStore("Like", () => {
       ? { connect: [{ documentId: data.trackDocId }] }
       : { connect: [{ id: data.trackId }] };
 
-    console.log('Track connect object:', trackConnect); // Debug log
-
     const res = await client<FindOne<Like>>(endpoint, {
       method: "POST",
       body: {
         data: {
           track: trackConnect,
+          users_permissions_user: { connect: [{ id: userId }] },
         },
       },
     });
@@ -61,17 +71,17 @@ export const useLikeStore = defineStore("Like", () => {
 
   // Add method to find user's like for a track
   const findUserLike = async (trackDocId: string) => {
-    const auth = useAuthStore();
-    if (!auth.isLoggedIn) return null;
+    const userId = await ensureUserId();
+    if (!userId) return null;
 
     const res = await client(endpoint, {
       method: "GET",
       params: {
         filters: {
           track: { documentId: { $eq: trackDocId } },
-          users_permissions_user: { id: { $eq: auth.getUser!.id } },
+          users_permissions_user: { id: { $eq: userId } },
         },
-        populate: ["track"],
+        populate: ["track", "users_permissions_user"],
       },
     });
 
@@ -80,35 +90,27 @@ export const useLikeStore = defineStore("Like", () => {
 
   // Load user's likes
   const loadUserLikes = async () => {
-    const auth = useAuthStore();
-    if (!auth.isLoggedIn) return;
+    const userId = await ensureUserId();
+    if (!userId) return;
 
     try {
-      console.log('Loading likes for user ID:', auth.getUser!.id);
-      
       const response = await client(endpoint, {
         method: "GET",
         params: {
+          filters: {
+            users_permissions_user: { id: { $eq: userId } },
+          },
           populate: ["track"],
         },
       });
 
-      console.log('Likes response:', response);
-
       userLikes.value.clear();
       if (response.data) {
-        // Filter client-side for now to avoid complex Strapi v5 filter syntax
-        const userLikesData = response.data.filter((like: any) => 
-          like.users_permissions_user?.id === auth.getUser!.id
-        );
-        
-        userLikesData.forEach((like: any) => {
+        response.data.forEach((like: any) => {
           if (like.track?.documentId) {
             userLikes.value.add(like.track.documentId);
           }
         });
-        
-        console.log('User likes loaded:', userLikes.value);
       }
     } catch (error) {
       console.error('Error loading user likes:', error);
@@ -117,6 +119,8 @@ export const useLikeStore = defineStore("Like", () => {
 
   // Check if user liked a track
   const isLiked = (trackDocId: string) => userLikes.value.has(trackDocId);
+  const markLiked = (trackDocId: string) => userLikes.value.add(trackDocId);
+  const unmarkLiked = (trackDocId: string) => userLikes.value.delete(trackDocId);
 
   return {
     get,
@@ -126,6 +130,8 @@ export const useLikeStore = defineStore("Like", () => {
     findUserLike,
     loadUserLikes,
     isLiked,
+    markLiked,
+    unmarkLiked,
     userLikes
   };
 });

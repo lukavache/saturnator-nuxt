@@ -131,24 +131,44 @@
       <!-- Header -->
       <header class="bg-white border-b-2 border-black">
         <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex justify-between items-center h-16">
+          <div class="flex min-h-16 flex-wrap items-center justify-between gap-3 py-3 sm:flex-nowrap sm:gap-0 sm:py-0">
             <!-- Left side - Logo -->
             <div class="flex items-center">
               <NuxtLink to="/" class="flex items-center">
                 <img src="/saturnator-logo.png" alt="Saturnator Logo" class="h-6 w-10 sm:h-8 sm:w-14 mr-2 sm:mr-3" />
-                <span class="text-lg sm:text-xl md:text-2xl font-bold text-saturnator-gray-dark">Saturnator</span>
+                <span class="hidden text-lg font-bold text-saturnator-gray-dark sm:inline sm:text-xl md:text-2xl">Saturnator</span>
               </NuxtLink>
             </div>
 
             <!-- Center - Search Bar -->
-            <div class="flex-1 max-w-2xl mx-4 sm:mx-8">
-              <div class="relative">
-                <img src="/search-bar.png" alt="Search" class="w-full h-10 object-contain" />
+            <div class="order-3 w-full flex-none sm:order-none sm:mx-8 sm:max-w-2xl sm:flex-1">
+              <div class="saturnator-search" @click="focusSearch">
+                <span ref="leftEyeRef" class="search-eye" aria-hidden="true">
+                  <span
+                    class="search-pupil"
+                    :style="{
+                      transform: `translate(${leftPupil.x}px, ${leftPupil.y}px)`
+                    }"
+                  ></span>
+                </span>
                 <input
+                  ref="searchInputRef"
+                  v-model="searchQuery"
                   type="text"
-                  placeholder=""
-                  class="absolute inset-0 w-full h-full pl-10 pr-10 py-2 bg-transparent text-sm focus:outline-none placeholder-gray-600"
+                  :placeholder="isSearchFocused ? '' : 'Search for Artist, Track or Album'"
+                  class="search-input"
+                  aria-label="Search for Artist, Track or Album"
+                  @focus="isSearchFocused = true"
+                  @blur="isSearchFocused = false"
                 />
+                <span ref="rightEyeRef" class="search-eye" aria-hidden="true">
+                  <span
+                    class="search-pupil"
+                    :style="{
+                      transform: `translate(${rightPupil.x}px, ${rightPupil.y}px)`
+                    }"
+                  ></span>
+                </span>
               </div>
             </div>
 
@@ -248,11 +268,51 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
 
 const currentLocale = ref('en')
 const userMenuOpen = ref(false)
 const isSidebarOpen = ref(false)
+const searchQuery = ref('')
+const isSearchFocused = ref(false)
+const searchInputRef = ref<HTMLInputElement>()
+const leftEyeRef = ref<HTMLElement>()
+const rightEyeRef = ref<HTMLElement>()
+const leftPupil = reactive({ x: 0, y: 0 })
+const rightPupil = reactive({ x: 0, y: 0 })
+
+const getPupilOffset = (eye: HTMLElement, clientX: number, clientY: number) => {
+  const rect = eye.getBoundingClientRect()
+  const eyeCenterX = rect.left + rect.width / 2
+  const eyeCenterY = rect.top + rect.height / 2
+  const deltaX = clientX - eyeCenterX
+  const deltaY = clientY - eyeCenterY
+  const distance = Math.hypot(deltaX, deltaY) || 1
+  const maxOffset = 6
+
+  return {
+    x: (deltaX / distance) * maxOffset,
+    y: (deltaY / distance) * maxOffset
+  }
+}
+
+const handlePointerMove = (event: PointerEvent) => {
+  if (leftEyeRef.value) {
+    const offset = getPupilOffset(leftEyeRef.value, event.clientX, event.clientY)
+    leftPupil.x = offset.x
+    leftPupil.y = offset.y
+  }
+
+  if (rightEyeRef.value) {
+    const offset = getPupilOffset(rightEyeRef.value, event.clientX, event.clientY)
+    rightPupil.x = offset.x
+    rightPupil.y = offset.y
+  }
+}
+
+const focusSearch = () => {
+  searchInputRef.value?.focus()
+}
 
 const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value
@@ -306,5 +366,97 @@ onMounted(async () => {
       userMenuOpen.value = false
     }
   })
+
+  window.addEventListener('pointermove', handlePointerMove, { passive: true })
 })
-</script> 
+
+onUnmounted(() => {
+  window.removeEventListener('pointermove', handlePointerMove)
+})
+</script>
+
+<style scoped>
+.saturnator-search {
+  display: grid;
+  grid-template-columns: 3.125rem minmax(7rem, 1fr) 3.125rem;
+  align-items: center;
+  width: 100%;
+  max-width: 18.75rem;
+  height: 2.5rem;
+  margin: 0 auto;
+  padding: 0 0.375rem;
+  border: 1px solid #000;
+  border-radius: 999px;
+  background: #fff;
+  cursor: text;
+}
+
+.search-eye {
+  position: relative;
+  display: block;
+  width: 2.625rem;
+  height: 1.25rem;
+  border: 1px solid #000;
+  border-radius: 50%;
+  background: #fff;
+  justify-self: center;
+  pointer-events: none;
+}
+
+.search-pupil {
+  position: absolute;
+  left: calc(50% - 0.25rem);
+  top: calc(50% - 0.25rem);
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid #000;
+  border-radius: 999px;
+  background: #000;
+  transition: transform 80ms linear;
+}
+
+.search-input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: #343a40;
+  caret-color: #000;
+  cursor: text;
+  font-size: 0.75rem;
+  line-height: 1;
+  outline: none;
+  text-align: center;
+}
+
+.search-input::placeholder {
+  color: #343a40;
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .saturnator-search {
+    grid-template-columns: 2.375rem minmax(3.5rem, 1fr) 2.375rem;
+    max-width: 12.5rem;
+    height: 2.25rem;
+    padding: 0 0.25rem;
+  }
+
+  .search-eye {
+    width: 2rem;
+    height: 1rem;
+  }
+
+  .search-pupil {
+    left: calc(50% - 0.1875rem);
+    top: calc(50% - 0.1875rem);
+    width: 0.375rem;
+    height: 0.375rem;
+  }
+
+  .search-input {
+    font-size: 0.625rem;
+  }
+}
+</style>

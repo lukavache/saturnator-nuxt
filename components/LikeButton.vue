@@ -2,15 +2,27 @@
   <button
     @click="handleLike"
     :disabled="loading"
-    class="flex items-center space-x-1 p-2 hover:bg-gray-100 hover:cursor-pointer rounded-lg transition-colors"
-    :class="{ 'text-red-500': isLiked }"
+    type="button"
+    :aria-pressed="isLiked"
+    :aria-label="isLiked ? 'Unlike track' : 'Like track'"
+    class="inline-flex items-center gap-2 rounded-full border border-black bg-white px-4 py-2 text-sm font-semibold text-saturnator-gray-dark shadow-sm transition-colors hover:bg-saturnator-gray-light disabled:cursor-not-allowed disabled:opacity-60"
+    :class="{ 'bg-saturnator-gray-dark text-white hover:bg-black': isLiked }"
   >
-    <img 
-      :src="isLiked ? '/star-for-likes-active.png' : '/star-for-likes.png'" 
-      :alt="isLiked ? 'Unlike' : 'Like'"
-      class="h-5 w-5 object-contain"
-    />
-    <span class="text-sm">{{ likeCount }}</span>
+    <svg
+      class="h-5 w-5"
+      :class="isLiked ? 'fill-white' : 'fill-none'"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      stroke-width="1.8"
+      aria-hidden="true"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M12 3.5l2.35 5.04 5.52.67-4.08 3.78 1.08 5.46L12 15.75l-4.87 2.7 1.08-5.46-4.08-3.78 5.52-.67L12 3.5z"
+      />
+    </svg>
+    <span>{{ displayedLikeCount }}</span>
   </button>
 </template>
 
@@ -28,10 +40,18 @@ const emit = defineEmits<{
 const likeStore = useLikeStore()
 const authStore = useAuthStore()
 const loading = ref(false)
+const displayedLikeCount = ref(props.likeCount)
 
 // Use trackDocId if provided, otherwise use trackId as string
 const effectiveTrackDocId = computed(() => props.trackDocId || props.trackId.toString())
 const isLiked = computed(() => likeStore.isLiked(effectiveTrackDocId.value))
+
+watch(
+  () => props.likeCount,
+  (likeCount) => {
+    displayedLikeCount.value = likeCount
+  }
+)
 
 // Load user likes when component mounts
 onMounted(async () => {
@@ -51,24 +71,17 @@ const handleLike = async () => {
     if (isLiked.value) {
       // Unlike - find and delete the like
       const userLike = await likeStore.findUserLike(effectiveTrackDocId.value)
-      console.log('Found user like:', userLike) // Debug log
       
       if (userLike) {
         // Use documentId if available, otherwise use id
         const likeId = userLike.documentId || userLike.id
-        console.log('Deleting like with ID:', likeId) // Debug log
         
         await likeStore.deleteLike(likeId)
-        
-        // Safety check for userLikes
-        if (likeStore.userLikes && likeStore.userLikes.value) {
-          likeStore.userLikes.value.delete(effectiveTrackDocId.value)
-        } else {
-          console.warn('userLikes not initialized, skipping remove from set')
-        }
-        
-        emit('update:likeCount', props.likeCount - 1)
       }
+
+      likeStore.unmarkLiked(effectiveTrackDocId.value)
+      displayedLikeCount.value = Math.max(0, displayedLikeCount.value - 1)
+      emit('update:likeCount', displayedLikeCount.value)
     } else {
       // Validate trackDocId before creating
       if (!effectiveTrackDocId.value || effectiveTrackDocId.value.trim() === '') {
@@ -76,18 +89,14 @@ const handleLike = async () => {
         return;
       }
       
-      await likeStore.create({
+      const createdLike = await likeStore.create({
         trackDocId: effectiveTrackDocId.value
       })
-      
-      // Safety check for userLikes
-      if (likeStore.userLikes && likeStore.userLikes.value) {
-        likeStore.userLikes.value.add(effectiveTrackDocId.value)
-      } else {
-        console.warn('userLikes not initialized, skipping add to set')
-      }
-      
-      emit('update:likeCount', props.likeCount + 1)
+      if (!createdLike) return
+
+      likeStore.markLiked(effectiveTrackDocId.value)
+      displayedLikeCount.value += 1
+      emit('update:likeCount', displayedLikeCount.value)
     }
   } catch (error) {
     console.error('Error toggling like:', error)

@@ -30,6 +30,7 @@ import { findOwnedPurchase, findOwnedPurchaseByApiToken } from './_lib/ownership
 import { buildLicenseReceipt, strapiPurchaseDownloadPath } from './_lib/receipt';
 import { extractRouteParams } from './_lib/route-params';
 import { verifyStrapiJwt } from './_lib/strapi-client';
+import { fetchArtistRank, fetchSpotlightBoard } from './_lib/spotlight';
 
 let cachedApp: Hono | null = null;
 let cachedForToken: string | null = null;
@@ -119,6 +120,17 @@ function buildApp(env: Env): Hono {
       mimeType: 'application/json',
     },
     'POST /api/x402/sponsor/:artistId': {
+      accepts: {
+        scheme: 'exact',
+        payTo: async (context) => (await resolveSponsorshipAttempt(config, context)).offer.payTo,
+        price: async (context) => `$${(await resolveSponsorshipAttempt(config, context)).offer.priceUsd}`,
+        network,
+      },
+      description: 'Sponsor an artist onto the transparent Spotlight leaderboard via x402',
+      mimeType: 'application/json',
+    },
+    // Plan alias (same handler semantics).
+    'POST /api/x402/artists/:artistId/sponsor': {
       accepts: {
         scheme: 'exact',
         payTo: async (context) => (await resolveSponsorshipAttempt(config, context)).offer.payTo,
@@ -223,8 +235,8 @@ function buildApp(env: Env): Hono {
     return c.json(body);
   });
 
-  app.post('/sponsor/:artistId', async (c) => {
-    const paymentHeader = c.req.header('x-payment');
+  async function sponsorshipReceipt(c: any, artistId: string) {
+    const paymentHeader = c.req.header('x-payment') || c.req.header('PAYMENT-SIGNATURE');
     const attempt = await consumeSponsorshipAttempt(paymentHeader);
     if (!attempt) {
       return c.json(
@@ -232,16 +244,49 @@ function buildApp(env: Env): Hono {
         500,
       );
     }
-    const { offer } = attempt;
+
+    // Rank is computed only AFTER settlement was recorded by onAfterSettle.
+    // Never invent a speculative rank for the UI.
+    let rankPayload: Awaited<ReturnType<typeof fetchArtistRank>> | null = null;
+    try {
+      rankPayload = await fetchArtistRank(config, attempt.offer.artistId);
+    } catch (error) {
+      console.error('[x402] failed to load post-settlement rank', error);
+    }
+
     return c.json({
       ok: true,
       sponsorship: {
-        artistId: offer.artistId,
-        artistUsername: offer.artistUsername,
-        priceUsd: offer.priceUsd,
+        artistId: attempt.offer.artistId,
+        artistUsername: attempt.offer.artistUsername,
+        priceUsd: attempt.offer.priceUsd,
+        payTo: attempt.offer.payTo,
       },
-      message: 'Sponsorship recorded. Spotlight leaderboard lands in Phase 4.',
+      rank: rankPayload?.rank ?? null,
+      score: rankPayload?.entry?.score ?? null,
+      uniqueSupporters: rankPayload?.entry?.uniqueSupporters ?? null,
+      totalUsd: rankPayload?.entry?.totalUsd ?? null,
+      explorerUrl: rankPayload?.entry?.latestExplorerUrl ?? null,
+      transactionSignature: rankPayload?.entry?.latestTransactionSignature ?? null,
+      message: 'Sponsorship recorded. Spotlight rank updates only after confirmed settlement.',
     });
+  }
+
+  app.post('/sponsor/:artistId', (c) => sponsorshipReceipt(c, c.req.param('artistId')));
+  app.post('/artists/:artistId/sponsor', (c) => sponsorshipReceipt(c, c.req.param('artistId')));
+
+  // Same-origin Spotlight proxy (public) — keeps the SPA on one origin for
+  // Cloudflare preview; also usable if Strapi CORS is tight.
+  app.get('/spotlight', async (c) => {
+    const window = c.req.query('window') || '24h';
+    const limit = Number(c.req.query('limit') || 20);
+    try {
+      const board = await fetchSpotlightBoard(config, { window, limit });
+      return c.json(board);
+    } catch (error) {
+      console.error('[x402] spotlight proxy failed', error);
+      return c.json({ error: 'upstream_error', message: 'Could not load Spotlight' }, 502);
+    }
   });
 
   return app;

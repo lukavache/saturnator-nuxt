@@ -1,4 +1,4 @@
-# Saturnator x402 — Implementation Map (Phase 0 / 0.5 / 1 / 2)
+# Saturnator x402 — Implementation Map (Phase 0 / 0.5 / 1 / 2 / 3 / 4)
 
 Read-only audit of the real repository (Phase 0), corrected to the actual
 Cloudflare Pages Functions + Strapi split architecture (Phase 0.5), extended with the
@@ -109,3 +109,17 @@ The plan assumes **one** Nuxt/Nitro app that also owns the CMS/database. Reality
 | Artist licensing UI | `saturnator-web/pages/upload.vue` |
 | Wallet verify UI | `saturnator-web/pages/settings.vue` |
 | Buyer purchase UI | `components/payments/LicensePurchaseButton.vue`, `PaymentReceiptModal.vue`, `pages/track/[id].vue` |
+
+## Phase 4 additions
+
+| Concern | Real path |
+|---|---|
+| Anti-whale ranking | `saturnator-api/src/utils/spotlight-ranking.ts` |
+| Leaderboard service | `artist-sponsorship` service `buildLeaderboard` / `rankForArtist` |
+| Public Spotlight API | `GET /api/spotlight`, `GET /api/spotlight/artists/:artistId` |
+| Sponsorship paywall + receipt | `POST /api/x402/sponsor/:artistId` (+ artists alias) |
+| Spotlight proxy | `GET /api/x402/spotlight` |
+| Spotlight SPA | `pages/spotlight.vue`, `stores/spotlight.ts`, `components/spotlight/*` |
+| Track support CTA | `pages/track/[id].vue` + nav link in `layouts/default.vue` |
+
+See `docs/x402-phase4-implementation.md`.

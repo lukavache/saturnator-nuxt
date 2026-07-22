@@ -44,11 +44,15 @@ async function requireBuyer(
   return { buyerId: user.id, buyerJwt: token };
 }
 
-async function optionalSponsor(config: X402Config, context: HTTPRequestContext): Promise<number | null> {
+async function requireSponsor(
+  config: X402Config,
+  context: HTTPRequestContext,
+): Promise<{ sponsorId: number; sponsorJwt: string }> {
   const token = extractJwtFromContext(context);
-  if (!token) return null;
+  if (!token) throw new OfferResolutionError('unauthenticated', 'Sign in required to sponsor an artist');
   const user = await verifyStrapiJwt(config, token);
-  return user?.id ?? null;
+  if (!user) throw new OfferResolutionError('unauthenticated', 'Invalid or expired Strapi JWT');
+  return { sponsorId: user.id, sponsorJwt: token };
 }
 
 /**
@@ -86,11 +90,12 @@ export function resolveSponsorshipAttempt(config: X402Config, context: HTTPReque
 
   const { artistId } = extractRouteParams(context.routePattern, context.path);
   const promise = (async (): Promise<SponsorshipAttempt> => {
-    const [offer, sponsorId] = await Promise.all([
+    // MVP: require login (plan scope cut — avoids anonymous/CORS paywall friction).
+    const [offer, sponsor] = await Promise.all([
       getSponsorshipOffer(config, artistId),
-      optionalSponsor(config, context),
+      requireSponsor(config, context),
     ]);
-    return { kind: 'sponsorship', offer, sponsorId };
+    return { kind: 'sponsorship', offer, sponsorId: sponsor.sponsorId };
   })();
 
   if (key) cacheOffer(key, promise);

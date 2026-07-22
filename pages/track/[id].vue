@@ -48,6 +48,15 @@
                       @update:like-count="updateLikeCount"
                     />
                   </div>
+                  <div v-if="artistUserId" class="mt-4 border-t-2 border-black pt-4">
+                    <p class="mb-2 text-xs font-bold uppercase tracking-wide text-saturnator-gray-medium">
+                      Support on Spotlight
+                    </p>
+                    <SponsorButton :artist-id="String(artistUserId)" price-usd="0.10" />
+                    <NuxtLink to="/spotlight" class="mt-2 inline-block text-xs font-semibold text-saturnator-blue-medium underline">
+                      View Spotlight leaderboard
+                    </NuxtLink>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -223,6 +232,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useTrackStore } from '../../stores/track'
 import { useRoute } from 'vue-router'
 import LicensePurchaseButton from '../../components/payments/LicensePurchaseButton.vue'
+import SponsorButton from '../../components/spotlight/SponsorButton.vue'
 
 // Get track ID from URL since auto-imports aren't working
 const route = useRoute()
@@ -291,6 +301,10 @@ const likeCount = ref(0)
 
 const artistName = computed(() => {
   return track.value?.username || track.value?.users_permissions_user?.username || 'Unknown Artist'
+})
+
+const artistUserId = computed(() => {
+  return track.value?.users_permissions_user?.id ?? null
 })
 
 const coverUrl = computed(() => {

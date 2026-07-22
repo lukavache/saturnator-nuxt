@@ -88,12 +88,13 @@ function buildApp(env: Env): Hono {
     '*',
     cors({
       origin: (origin) => {
-        if (!origin) return corsOrigins[0] || '*';
+        if (!origin) return corsOrigins[0] || 'http://localhost:3000';
         if (corsOrigins.includes('*') || corsOrigins.includes(origin)) return origin;
         // Same-origin Pages Function calls often omit Origin; allow listed preview hosts.
         if (/^https:\/\/[a-z0-9-]+\.saturnator\.pages\.dev$/i.test(origin)) return origin;
-        return corsOrigins[0] || origin;
+        return origin;
       },
+      credentials: true,
       allowMethods: ['GET', 'POST', 'OPTIONS'],
       allowHeaders: ['content-type', 'authorization', 'x-payment', 'payment-signature', 'x-request-id'],
       exposeHeaders: ['payment-required', 'payment-response', 'x-payment-response', 'x-request-id'],

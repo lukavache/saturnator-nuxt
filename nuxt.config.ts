@@ -39,8 +39,13 @@ export default defineNuxtConfig({
   // Runtime config for environment variables
   runtimeConfig: {
     public: {
-      apiBase: process.env.STRAPI_URL || 'http://localhost:1337'
-    }
+      apiBase: process.env.STRAPI_URL || 'http://localhost:1337',
+      // Empty = same-origin (Cloudflare Pages). Local Nuxt cannot host Functions,
+      // so default to wrangler pages dev. Override with NUXT_PUBLIC_X402_BASE.
+      x402Base:
+        process.env.NUXT_PUBLIC_X402_BASE ||
+        (process.env.NODE_ENV === 'production' ? '' : 'http://127.0.0.1:8788'),
+    },
   },
   
   // Auto-imports
@@ -57,17 +62,5 @@ export default defineNuxtConfig({
     '/upload': {
       ssr: false
     }
-  },
-
-  // Local `nuxt dev` (:3000) does not run Cloudflare Pages Functions.
-  // Proxy /api/x402/* to `wrangler pages dev` (:8788) so auth-bridge / paywall work.
-  nitro: {
-    // Forwards /api/x402/* → http://127.0.0.1:8788/api/x402/* (path preserved).
-    devProxy: {
-      '/api/x402': {
-        target: 'http://127.0.0.1:8788',
-        changeOrigin: true,
-      },
-    },
   },
 })

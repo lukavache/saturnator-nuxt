@@ -10,8 +10,11 @@ Full guide: [`docs/x402-integration.md`](./docs/x402-integration.md) · checklis
 ```bash
 npm install
 # Configure .dev.vars (STRAPI_URL, STRAPI_API_TOKEN) — never commit secrets
-npm run generate
-npm run pages:dev          # site + /api/x402 on :8788
+
+# Local UI + payments (two processes):
+npm run pages:dev          # x402 Functions on :8788 (required for Buy / Spotlight pay)
+npm run dev                # Nuxt UI on :3000 (calls :8788 via NUXT_PUBLIC_X402_BASE)
+
 npm run probe:x402         # unpaid 402 smoke
 npm test
 npm run typecheck

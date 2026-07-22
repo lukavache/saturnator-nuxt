@@ -27,7 +27,7 @@ const CODE_MESSAGES: Record<string, string> = {
   signature_rejected: 'Wallet signature was rejected. Approve the request in your wallet to continue.',
   asset_removed: 'This asset was removed or unpublished during payment. Do not retry the same purchase.',
   x402_unavailable:
-    'Payment API is not reachable. Keep `npm run pages:dev` (port 8788) running alongside `npm run dev`, then retry.',
+    'Payment API is not reachable on :8788. Keep `npm run pages:dev` running next to `npm run dev`, then retry.',
 };
 
 const PATTERN_MESSAGES: Array<{ re: RegExp; message: string }> = [

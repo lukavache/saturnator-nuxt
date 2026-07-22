@@ -104,14 +104,15 @@ export const useLikeStore = defineStore("Like", () => {
         },
       });
 
-      userLikes.value.clear();
+      const next = new Set<string>();
       if (response.data) {
         response.data.forEach((like: any) => {
           if (like.track?.documentId) {
-            userLikes.value.add(like.track.documentId);
+            next.add(like.track.documentId);
           }
         });
       }
+      userLikes.value = next;
     } catch (error) {
       console.error('Error loading user likes:', error);
     }
@@ -119,8 +120,17 @@ export const useLikeStore = defineStore("Like", () => {
 
   // Check if user liked a track
   const isLiked = (trackDocId: string) => userLikes.value.has(trackDocId);
-  const markLiked = (trackDocId: string) => userLikes.value.add(trackDocId);
-  const unmarkLiked = (trackDocId: string) => userLikes.value.delete(trackDocId);
+  // Replace the Set so Vue reactivity picks up mutations.
+  const markLiked = (trackDocId: string) => {
+    const next = new Set(userLikes.value);
+    next.add(trackDocId);
+    userLikes.value = next;
+  };
+  const unmarkLiked = (trackDocId: string) => {
+    const next = new Set(userLikes.value);
+    next.delete(trackDocId);
+    userLikes.value = next;
+  };
 
   return {
     get,

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { useAuthStore } from './auth'
 import { mapX402UserError } from '../utils/x402-errors'
+import { x402Url } from '../utils/x402-base'
 
 export interface LicenseReceipt {
   purchaseId: string
@@ -34,8 +35,9 @@ export const useLicenseStore = defineStore('license', () => {
     if (!auth.getToken) return null
     try {
       const res = await client<any>(`license-purchases/for-track/${trackId}`, { method: 'GET' })
-      const data = res?.data || res
-      if (!data?.id && !data?.documentId) {
+      const data = res?.data ?? res
+      // Explicit null body from for-track means not owned (HTTP 200).
+      if (data === null || data === undefined || (!data?.id && !data?.documentId)) {
         ownedByTrack.value[trackId] = null
         return null
       }
@@ -52,7 +54,7 @@ export const useLicenseStore = defineStore('license', () => {
         explorerUrl: data.transactionSignature
           ? `https://explorer.solana.com/tx/${data.transactionSignature}?cluster=devnet`
           : '',
-        downloadUrl: `/api/x402/licenses/${encodeURIComponent(purchaseId)}/download`,
+        downloadUrl: x402Url(`/api/x402/licenses/${encodeURIComponent(purchaseId)}/download`),
         sellerWalletAddress: data.sellerWalletAddress,
         alreadyOwned: true,
       }
@@ -94,9 +96,10 @@ export const useLicenseStore = defineStore('license', () => {
     if (!auth.getToken) throw new Error('Sign in required')
     let res: Response
     try {
-      res = await fetch('/api/x402/auth-bridge', {
+      res = await fetch(x402Url('/api/x402/auth-bridge'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.getToken}` },
+        credentials: 'include',
       })
     } catch (e) {
       throw Object.assign(new Error(mapX402UserError({ code: 'x402_unavailable' })), {
@@ -121,13 +124,14 @@ export const useLicenseStore = defineStore('license', () => {
   /** Opens the official x402 HTML paywall for this track (same-origin). */
   async function startLicensePurchase(trackId: string): Promise<void> {
     await preparePaywallSession()
-    window.location.href = `/api/x402/license/${encodeURIComponent(trackId)}`
+    window.location.href = x402Url(`/api/x402/license/${encodeURIComponent(trackId)}`)
   }
 
   async function fetchDownloadBundle(purchaseId: string): Promise<DownloadBundle> {
     if (!auth.getToken) throw new Error('Sign in required')
-    const res = await fetch(`/api/x402/licenses/${encodeURIComponent(purchaseId)}/download`, {
+    const res = await fetch(x402Url(`/api/x402/licenses/${encodeURIComponent(purchaseId)}/download`), {
       headers: { Authorization: `Bearer ${auth.getToken}` },
+      credentials: 'include',
     })
     const body = await res.json()
     if (!res.ok) throw Object.assign(new Error(mapX402UserError(body)), { code: body?.error })

@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { useAuthStore } from './auth'
+import { mapX402UserError } from '../utils/x402-errors'
+import { x402Url } from '../utils/x402-base'
 
 export interface SpotlightRow {
   rank: number
@@ -48,15 +50,15 @@ export const useSpotlightStore = defineStore('spotlight', () => {
     loading.value = true
     error.value = ''
     try {
-      // Prefer same-origin Pages Function proxy; fall back to Strapi.
       const window = opts.window || '24h'
       const limit = opts.limit ?? 20
-      let res = await fetch(`/api/x402/spotlight?window=${encodeURIComponent(window)}&limit=${limit}`)
+      const query = `window=${encodeURIComponent(window)}&limit=${limit}`
+      let res = await fetch(x402Url(`/api/x402/spotlight?${query}`), {
+        credentials: 'include',
+      })
       if (!res.ok) {
         const config = useRuntimeConfig()
-        res = await fetch(
-          `${config.public.apiBase}/api/spotlight?window=${encodeURIComponent(window)}&limit=${limit}`,
-        )
+        res = await fetch(`${config.public.apiBase}/api/spotlight?${query}`)
       }
       if (!res.ok) throw new Error('Could not load Spotlight leaderboard')
       board.value = (await res.json()) as SpotlightBoard
@@ -77,12 +79,12 @@ export const useSpotlightStore = defineStore('spotlight', () => {
     // Optimistic UX: spinner only — rank updates after confirmed settlement.
     pendingArtistId.value = artistId
     try {
-      const { mapX402UserError } = await import('../utils/x402-errors')
       let bridge: Response
       try {
-        bridge = await fetch('/api/x402/auth-bridge', {
+        bridge = await fetch(x402Url('/api/x402/auth-bridge'), {
           method: 'POST',
           headers: { Authorization: `Bearer ${auth.getToken}` },
+          credentials: 'include',
         })
       } catch {
         throw Object.assign(new Error(mapX402UserError({ code: 'x402_unavailable' })), {
@@ -104,7 +106,7 @@ export const useSpotlightStore = defineStore('spotlight', () => {
       // Official x402 HTML paywall — POST-protected sponsor route via form submit.
       const form = document.createElement('form')
       form.method = 'POST'
-      form.action = `/api/x402/artists/${encodeURIComponent(artistId)}/sponsor`
+      form.action = x402Url(`/api/x402/artists/${encodeURIComponent(artistId)}/sponsor`)
       document.body.appendChild(form)
       form.submit()
     } catch (e) {

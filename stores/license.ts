@@ -125,11 +125,13 @@ export const useLicenseStore = defineStore('license', () => {
     }
   }
 
-  /** Opens the official x402 HTML paywall (Pages Function on :8788 in local dev). */
-  async function startLicensePurchase(trackId: string): Promise<void> {
+  /**
+   * Prepares the paywall session and returns the absolute paywall URL.
+   * Caller should navigate with window.location (full page load).
+   */
+  async function startLicensePurchase(trackId: string): Promise<string> {
     await preparePaywallSession()
-    const url = x402Url(`/api/x402/license/${encodeURIComponent(trackId)}`)
-    window.location.assign(url)
+    return x402Url(`/api/x402/license/${encodeURIComponent(trackId)}`)
   }
 
   async function fetchDownloadBundle(purchaseId: string): Promise<DownloadBundle> {

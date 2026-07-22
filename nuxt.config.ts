@@ -41,10 +41,11 @@ export default defineNuxtConfig({
     public: {
       apiBase: process.env.STRAPI_URL || 'http://localhost:1337',
       // Empty = same-origin (Cloudflare Pages). Local Nuxt cannot host Functions,
-      // so default to wrangler pages dev. Override with NUXT_PUBLIC_X402_BASE.
+      // so default to wrangler pages dev. Client code rewrites hostname to match
+      // the page (localhost vs 127.0.0.1). Override with NUXT_PUBLIC_X402_BASE.
       x402Base:
         process.env.NUXT_PUBLIC_X402_BASE ||
-        (process.env.NODE_ENV === 'production' ? '' : 'http://127.0.0.1:8788'),
+        (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8788'),
     },
   },
   

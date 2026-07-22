@@ -58,12 +58,8 @@ async function sponsor() {
   localBusy.value = true
   try {
     await spotlight.startSponsorship(props.artistId)
-    window.setTimeout(() => {
-      localBusy.value = false
-      spotlight.clearPending()
-      error.value =
-        'Paywall did not open. Confirm `npm run pages:dev` is running on :8788, then retry.'
-    }, 2500)
+    // Form submit should navigate away; clear local busy for back-navigation.
+    localBusy.value = false
   } catch (e: any) {
     error.value = mapX402UserError(e)
     localBusy.value = false

@@ -108,6 +108,7 @@ export const useSpotlightStore = defineStore('spotlight', () => {
       const form = document.createElement('form')
       form.method = 'POST'
       form.action = x402Url(`/api/x402/artists/${encodeURIComponent(artistId)}/sponsor`)
+      form.style.display = 'none'
       document.body.appendChild(form)
       form.submit()
     } catch (e) {

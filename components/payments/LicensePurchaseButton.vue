@@ -128,14 +128,12 @@ async function buy() {
   }
   busy.value = true
   try {
-    await licenseStore.startLicensePurchase(props.trackId)
-    // Full navigation to the paywall should unload this page. If we're still
-    // here shortly after, reset so the button is not stuck on "Opening…".
-    window.setTimeout(() => {
-      busy.value = false
-      error.value =
-        'Paywall did not open. Confirm `npm run pages:dev` is running on :8788, then retry.'
-    }, 2500)
+    const paywallUrl = await licenseStore.startLicensePurchase(props.trackId)
+    // Prefer top-level navigation so the official x402 HTML paywall can render.
+    // Do not show a false "did not open" error — loading :8788 can take longer
+    // than a short timer while the offer is resolved.
+    busy.value = false
+    window.location.href = paywallUrl
   } catch (e: any) {
     error.value = mapX402UserError(e)
     busy.value = false

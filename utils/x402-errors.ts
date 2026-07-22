@@ -26,6 +26,8 @@ const CODE_MESSAGES: Record<string, string> = {
   no_wallet: 'No Solana wallet found. Install Phantom or Solflare, unlock it, then retry.',
   signature_rejected: 'Wallet signature was rejected. Approve the request in your wallet to continue.',
   asset_removed: 'This asset was removed or unpublished during payment. Do not retry the same purchase.',
+  x402_unavailable:
+    'Payment API is not reachable. Keep `npm run pages:dev` (port 8788) running alongside `npm run dev`, then retry.',
 };
 
 const PATTERN_MESSAGES: Array<{ re: RegExp; message: string }> = [
@@ -35,6 +37,10 @@ const PATTERN_MESSAGES: Array<{ re: RegExp; message: string }> = [
   { re: /wrong network|devnet|mainnet-beta|cluster/i, message: CODE_MESSAGES.wrong_network },
   { re: /facilitator|fetch failed|502|503|ECONNREFUSED/i, message: CODE_MESSAGES.facilitator_unavailable },
   { re: /timeout|timed out/i, message: CODE_MESSAGES.settlement_timeout },
+  {
+    re: /page not found|auth-bridge|\/api\/x402|ECONNREFUSED|socket hang up/i,
+    message: CODE_MESSAGES.x402_unavailable,
+  },
 ];
 
 export function mapX402UserError(error: unknown, fallback = 'Something went wrong. Try again, or check your receipt before paying twice.'): string {

@@ -77,14 +77,31 @@ export const useSpotlightStore = defineStore('spotlight', () => {
     // Optimistic UX: spinner only — rank updates after confirmed settlement.
     pendingArtistId.value = artistId
     try {
-      const bridge = await fetch('/api/x402/auth-bridge', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${auth.getToken}` },
-      })
-      if (!bridge.ok) throw new Error('Could not start sponsorship session')
-      // Official x402 HTML paywall (POST routes: browser navigates via form GET fallback —
-      // we use location to the sponsor endpoint; middleware accepts the request method from routes).
-      // For POST-protected resources, open via a same-origin form POST.
+      const { mapX402UserError } = await import('../utils/x402-errors')
+      let bridge: Response
+      try {
+        bridge = await fetch('/api/x402/auth-bridge', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${auth.getToken}` },
+        })
+      } catch {
+        throw Object.assign(new Error(mapX402UserError({ code: 'x402_unavailable' })), {
+          code: 'x402_unavailable',
+        })
+      }
+      if (!bridge.ok) {
+        const contentType = bridge.headers.get('content-type') || ''
+        const body = contentType.includes('application/json')
+          ? await bridge.json().catch(() => ({}))
+          : { message: await bridge.text().catch(() => '') }
+        const raw = String(body?.message || '')
+        const code =
+          bridge.status === 404 || /page not found|auth-bridge/i.test(raw)
+            ? 'x402_unavailable'
+            : body.error || 'unauthenticated'
+        throw Object.assign(new Error(mapX402UserError({ ...body, code, message: raw })), { code })
+      }
+      // Official x402 HTML paywall — POST-protected sponsor route via form submit.
       const form = document.createElement('form')
       form.method = 'POST'
       form.action = `/api/x402/artists/${encodeURIComponent(artistId)}/sponsor`

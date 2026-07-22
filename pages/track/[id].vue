@@ -63,34 +63,32 @@
 
             <section class="p-5 sm:p-8">
               <div class="flex flex-col gap-5">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div class="min-w-0">
-                    <div class="mb-3 flex flex-wrap items-center gap-2">
-                      <span class="rounded-full border border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-saturnator-gray-dark">
-                        {{ track.trackStatus || 'approved' }}
-                      </span>
-                      <span v-if="track.createdAt" class="text-sm font-medium text-saturnator-gray-medium">
-                        {{ formatDate(track.createdAt) }}
-                      </span>
-                    </div>
-
-                    <h1 class="break-words text-4xl font-black leading-tight text-saturnator-gray-dark sm:text-5xl">
-                      {{ track.title }}
-                    </h1>
-
-                    <p class="mt-3 text-lg font-semibold text-saturnator-gray-medium">
-                      by {{ artistName }}
-                    </p>
+                <div>
+                  <div class="mb-3 flex flex-wrap items-center gap-2">
+                    <span class="rounded-full border border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-saturnator-gray-dark">
+                      {{ track.trackStatus || 'approved' }}
+                    </span>
+                    <span v-if="track.createdAt" class="text-sm font-medium text-saturnator-gray-medium">
+                      {{ formatDate(track.createdAt) }}
+                    </span>
                   </div>
 
-                  <div class="shrink-0 md:pt-2">
-                    <LicensePurchaseButton
-                      :track-id="String(track.documentId || track.id)"
-                      :price-usd="track.licensePriceUsd"
-                      :x402-enabled="track.x402Enabled"
-                      :track-title="track.title"
-                    />
-                  </div>
+                  <h1 class="break-words text-4xl font-black leading-tight text-saturnator-gray-dark sm:text-5xl">
+                    {{ track.title }}
+                  </h1>
+
+                  <p class="mt-3 text-lg font-semibold text-saturnator-gray-medium">
+                    by {{ artistName }}
+                  </p>
+                </div>
+
+                <div class="w-full max-w-xl">
+                  <LicensePurchaseButton
+                    :track-id="String(track.documentId || track.id)"
+                    :price-usd="track.licensePriceUsd"
+                    :x402-enabled="track.x402Enabled"
+                    :track-title="track.title"
+                  />
                 </div>
 
                 <div class="rounded-lg border-2 border-black bg-saturnator-gray-light p-4">

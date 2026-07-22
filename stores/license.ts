@@ -92,15 +92,29 @@ export const useLicenseStore = defineStore('license', () => {
 
   async function preparePaywallSession(): Promise<void> {
     if (!auth.getToken) throw new Error('Sign in required')
-    const res = await fetch('/api/x402/auth-bridge', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${auth.getToken}` },
-    })
-    const body = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      throw Object.assign(new Error(mapX402UserError(body)), {
-        code: body.error || 'unauthenticated',
+    let res: Response
+    try {
+      res = await fetch('/api/x402/auth-bridge', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${auth.getToken}` },
       })
+    } catch (e) {
+      throw Object.assign(new Error(mapX402UserError({ code: 'x402_unavailable' })), {
+        code: 'x402_unavailable',
+        cause: e,
+      })
+    }
+    const contentType = res.headers.get('content-type') || ''
+    const body = contentType.includes('application/json')
+      ? await res.json().catch(() => ({}))
+      : { message: await res.text().catch(() => '') }
+    if (!res.ok) {
+      const raw = String(body?.message || body?.error || '')
+      const code =
+        res.status === 404 || /page not found|auth-bridge/i.test(raw)
+          ? 'x402_unavailable'
+          : body.error || 'unauthenticated'
+      throw Object.assign(new Error(mapX402UserError({ ...body, code, message: raw })), { code })
     }
   }
 

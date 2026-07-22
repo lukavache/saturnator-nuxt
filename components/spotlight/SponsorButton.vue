@@ -2,7 +2,7 @@
   <div class="space-y-2">
     <button
       type="button"
-      class="rounded-lg border-2 border-black bg-saturnator-blue-medium px-4 py-2 text-sm font-bold text-white hover:bg-saturnator-blue-dark transition-colors disabled:opacity-50"
+      class="inline-flex w-full items-center justify-center rounded-lg border-2 border-black bg-[#3686FF] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#248DDA] transition-colors disabled:opacity-50"
       :disabled="busy"
       @click="sponsor"
     >
@@ -11,7 +11,7 @@
     <p v-if="busy" class="text-xs font-medium text-saturnator-gray-medium">
       Waiting for wallet / settlement… rank will update only after confirmation.
     </p>
-    <p v-if="error" class="text-xs font-semibold text-saturnator-red">{{ error }}</p>
+    <p v-if="error" class="text-xs font-semibold text-[#ED1C24]">{{ error }}</p>
   </div>
 </template>
 

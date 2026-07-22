@@ -22,7 +22,7 @@
         </span>
         <button
           type="button"
-          class="rounded-lg border-2 border-black bg-saturnator-blue-medium px-4 py-2 text-sm font-bold text-white hover:bg-saturnator-blue-dark transition-colors"
+          class="inline-flex items-center justify-center rounded-lg border-2 border-black bg-[#3686FF] px-4 py-2 text-sm font-bold text-white hover:bg-[#248DDA] transition-colors"
           :disabled="downloading"
           @click="download"
         >
@@ -37,21 +37,21 @@
         </button>
       </div>
 
-      <div v-else class="flex flex-wrap items-center gap-3">
+      <div v-else class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="button"
-          class="rounded-lg border-2 border-black bg-saturnator-blue-medium px-4 py-2 text-sm font-bold text-white hover:bg-saturnator-blue-dark transition-colors disabled:opacity-50"
+          class="inline-flex items-center justify-center rounded-lg border-2 border-black bg-[#3686FF] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#248DDA] transition-colors disabled:opacity-50"
           :disabled="busy"
           @click="buy"
         >
           {{ buttonLabel }}
         </button>
-        <p class="text-sm font-medium text-saturnator-gray-medium">
+        <p class="text-sm font-medium text-saturnator-gray-medium sm:max-w-xs">
           Free preview stays free. Purchase unlocks the original + sample pack.
         </p>
       </div>
 
-      <p v-if="error" class="text-sm font-semibold text-saturnator-red">{{ error }}</p>
+      <p v-if="error" class="text-sm font-semibold text-[#ED1C24]">{{ error }}</p>
     </template>
 
     <PaymentReceiptModal

@@ -57,5 +57,17 @@ export default defineNuxtConfig({
     '/upload': {
       ssr: false
     }
-  }
+  },
+
+  // Local `nuxt dev` (:3000) does not run Cloudflare Pages Functions.
+  // Proxy /api/x402/* to `wrangler pages dev` (:8788) so auth-bridge / paywall work.
+  nitro: {
+    // Forwards /api/x402/* → http://127.0.0.1:8788/api/x402/* (path preserved).
+    devProxy: {
+      '/api/x402': {
+        target: 'http://127.0.0.1:8788',
+        changeOrigin: true,
+      },
+    },
+  },
 })

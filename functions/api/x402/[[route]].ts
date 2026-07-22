@@ -29,7 +29,7 @@ import { extractJwtFromContext, extractJwtFromHono, AUTH_COOKIE } from './_lib/a
 import { findOwnedPurchase, findOwnedPurchaseByApiToken } from './_lib/ownership';
 import { buildLicenseReceipt, strapiPurchaseDownloadPath } from './_lib/receipt';
 import { extractRouteParams } from './_lib/route-params';
-import { verifyStrapiJwt } from './_lib/strapi-client';
+import { verifyStrapiJwtDetailed } from './_lib/strapi-client';
 import { fetchArtistRank, fetchSpotlightBoard } from './_lib/spotlight';
 import { newRequestId, x402Log } from './_lib/logger';
 import { checkRateLimit } from './_lib/rate-limit';
@@ -209,8 +209,19 @@ function buildApp(env: Env): Hono {
   app.post('/auth-bridge', async (c) => {
     const jwt = extractJwtFromHono(c);
     if (!jwt) return c.json({ error: 'unauthenticated', message: 'Bearer token required' }, 401);
-    const user = await verifyStrapiJwt(config, jwt);
-    if (!user) return c.json({ error: 'unauthenticated', message: 'Invalid JWT' }, 401);
+    const verified = await verifyStrapiJwtDetailed(config, jwt);
+    if (!verified.ok) {
+      if (verified.reason === 'unreachable') {
+        return c.json(
+          {
+            error: 'strapi_unreachable',
+            message: `Cannot reach Strapi at ${config.strapiUrl}. Check STRAPI_URL in .dev.vars (local Strapi is usually http://127.0.0.1:1337).`,
+          },
+          502,
+        );
+      }
+      return c.json({ error: 'unauthenticated', message: 'Invalid JWT' }, 401);
+    }
 
     setCookie(c, AUTH_COOKIE, jwt, {
       httpOnly: true,
@@ -219,7 +230,7 @@ function buildApp(env: Env): Hono {
       maxAge: 10 * 60,
       secure: c.req.url.startsWith('https://'),
     });
-    return c.json({ ok: true, userId: user.id });
+    return c.json({ ok: true, userId: verified.user.id });
   });
 
   const routes: RoutesConfig = {

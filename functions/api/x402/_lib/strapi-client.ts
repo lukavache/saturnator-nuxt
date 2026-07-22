@@ -47,19 +47,36 @@ export async function strapiFetch<T = unknown>(
   return body as T;
 }
 
+export type JwtVerifyFailureReason = 'invalid' | 'unreachable';
+
 /** Verifies a user's Strapi JWT by asking Strapi who it belongs to (never decoded locally). */
 export async function verifyStrapiJwt(
   config: X402Config,
   jwt: string,
 ): Promise<{ id: number; username: string } | null> {
+  const result = await verifyStrapiJwtDetailed(config, jwt);
+  return result.ok ? result.user : null;
+}
+
+export async function verifyStrapiJwtDetailed(
+  config: X402Config,
+  jwt: string,
+): Promise<
+  | { ok: true; user: { id: number; username: string } }
+  | { ok: false; reason: JwtVerifyFailureReason; status?: number }
+> {
   try {
     const response = await fetch(`${config.strapiUrl}/api/users/me`, {
       headers: { Authorization: `Bearer ${jwt}` },
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      return { ok: false, reason: 'invalid', status: response.status };
+    }
     const user = (await response.json()) as { id: number; username: string };
-    return user;
+    if (!user?.id) return { ok: false, reason: 'invalid', status: response.status };
+    return { ok: true, user };
   } catch {
-    return null;
+    // Wrong STRAPI_URL in .dev.vars (e.g. dead port) surfaces as unreachable.
+    return { ok: false, reason: 'unreachable' };
   }
 }

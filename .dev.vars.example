@@ -9,6 +9,10 @@ STRAPI_URL=http://127.0.0.1:1337
 # Token -> Token duration: Unlimited -> Token type: Full access).
 # Used ONLY server-side, by this Pages Function, to resolve offers and
 # record settlements. Never expose this to the browser.
+#
+# If Buy opens auth-bridge 200 but license/paywall fails with 502, this token
+# is wrong/stale for your local DB — recreate it in Strapi Admin and paste here,
+# then restart `npm run pages:dev`.
 STRAPI_API_TOKEN=replace-with-a-real-strapi-full-access-api-token
 
 # Optional: must match saturnator-api LICENSE_DOWNLOAD_SECRET if you mint

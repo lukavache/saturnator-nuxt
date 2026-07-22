@@ -100,6 +100,7 @@ export const useLicenseStore = defineStore('license', () => {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.getToken}` },
         credentials: 'include',
+        signal: AbortSignal.timeout(12_000),
       })
     } catch (e) {
       throw Object.assign(new Error(mapX402UserError({ code: 'x402_unavailable' })), {
@@ -114,17 +115,21 @@ export const useLicenseStore = defineStore('license', () => {
     if (!res.ok) {
       const raw = String(body?.message || body?.error || '')
       const code =
-        res.status === 404 || /page not found|auth-bridge/i.test(raw)
+        res.status === 404 ||
+        res.status === 502 ||
+        body.error === 'strapi_unreachable' ||
+        /page not found|auth-bridge|strapi/i.test(raw)
           ? 'x402_unavailable'
           : body.error || 'unauthenticated'
       throw Object.assign(new Error(mapX402UserError({ ...body, code, message: raw })), { code })
     }
   }
 
-  /** Opens the official x402 HTML paywall for this track (same-origin). */
+  /** Opens the official x402 HTML paywall (Pages Function on :8788 in local dev). */
   async function startLicensePurchase(trackId: string): Promise<void> {
     await preparePaywallSession()
-    window.location.href = x402Url(`/api/x402/license/${encodeURIComponent(trackId)}`)
+    const url = x402Url(`/api/x402/license/${encodeURIComponent(trackId)}`)
+    window.location.assign(url)
   }
 
   async function fetchDownloadBundle(purchaseId: string): Promise<DownloadBundle> {

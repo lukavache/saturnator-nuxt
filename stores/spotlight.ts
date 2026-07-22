@@ -85,6 +85,7 @@ export const useSpotlightStore = defineStore('spotlight', () => {
           method: 'POST',
           headers: { Authorization: `Bearer ${auth.getToken}` },
           credentials: 'include',
+          signal: AbortSignal.timeout(12_000),
         })
       } catch {
         throw Object.assign(new Error(mapX402UserError({ code: 'x402_unavailable' })), {

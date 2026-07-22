@@ -129,6 +129,13 @@ async function buy() {
   busy.value = true
   try {
     await licenseStore.startLicensePurchase(props.trackId)
+    // Full navigation to the paywall should unload this page. If we're still
+    // here shortly after, reset so the button is not stuck on "Opening…".
+    window.setTimeout(() => {
+      busy.value = false
+      error.value =
+        'Paywall did not open. Confirm `npm run pages:dev` is running on :8788, then retry.'
+    }, 2500)
   } catch (e: any) {
     error.value = mapX402UserError(e)
     busy.value = false
@@ -159,6 +166,7 @@ async function download() {
 }
 
 onMounted(async () => {
+  busy.value = false
   await refresh()
   // Returning from paywall: if not yet owned, poll without inviting a second charge.
   if (auth.isLoggedIn && licensable.value && state.value === 'preview') {

@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useSpotlightStore } from '../../stores/spotlight'
 import { mapX402UserError } from '../../utils/x402-errors'
@@ -41,6 +41,14 @@ const label = computed(() => {
   return busy.value ? 'Confirming…' : `Support with ${price} USDC`
 })
 
+onMounted(() => {
+  // Back-navigation from a cancelled paywall can leave pending stuck.
+  localBusy.value = false
+  if (spotlight.pendingArtistId === props.artistId) {
+    spotlight.clearPending()
+  }
+})
+
 async function sponsor() {
   error.value = ''
   if (!auth.isLoggedIn) {
@@ -50,6 +58,12 @@ async function sponsor() {
   localBusy.value = true
   try {
     await spotlight.startSponsorship(props.artistId)
+    window.setTimeout(() => {
+      localBusy.value = false
+      spotlight.clearPending()
+      error.value =
+        'Paywall did not open. Confirm `npm run pages:dev` is running on :8788, then retry.'
+    }, 2500)
   } catch (e: any) {
     error.value = mapX402UserError(e)
     localBusy.value = false

@@ -1,6 +1,8 @@
 # Saturnator x402 — Integration Notes (Phase 0)
 
-Status: **Phase 0 / 0.5** (Cloudflare Pages Functions runtime validated; no product code integrated).
+Status: **Phase 0 / 0.5 / 2 complete** (Cloudflare Pages Functions runtime validated; shared x402
+server module — dynamic offers, idempotent settlement — implemented and locally verified end to
+end). See `docs/x402-phase2-implementation.md` for the full Phase 2 report.
 
 ## Hackathon technical constraints (authoritative)
 
@@ -58,9 +60,10 @@ Source of truth for the API surface (read from the installed packages, not memor
 - 402 response carries requirements in the **`payment-required`** response header (base64-encoded JSON), body is `{}` for JSON clients.
 
 ### Still to confirm in later phases (not required for Phase 0)
-- Dynamic `payTo(context)` / `price(context)` functions resolving the route `:id` against Strapi.
-- `x402ResourceServer.onAfterSettle(...)` field shapes (`SettleResultContext`) — inspect pinned types before use.
-- Browser paywall / Wallet Standard signer with Phantom/Solflare.
+- ~~Dynamic `payTo(context)` / `price(context)` functions resolving the route `:id` against Strapi.~~ **Done, Phase 2.**
+- ~~`x402ResourceServer.onAfterSettle(...)` field shapes (`SettleResultContext`) — inspect pinned types before use.~~ **Done, Phase 2** (`SettleContext = { paymentPayload, requirements, declaredExtensions, transportContext? }`, `SettleResultContext` adds `result: SettleResponse`; `HTTPRequestContext` has no parsed route params, only `path`/`routePattern`/`paymentHeader`/`adapter`).
+- Browser paywall / Wallet Standard signer with Phantom/Solflare — still open, Phase 3+.
+- A real signed Devnet USDC payment completing the paid retry + `onAfterSettle` write end-to-end — still open, Phase 3+ (Phase 2 verified the unpaid 402 path and the settlement-recording code path directly, not a live on-chain settlement).
 
 ## Runtime-compatibility decision (FINALIZED — Phase 0.5)
 
@@ -111,11 +114,18 @@ value requires a signed Devnet payment (Phase 3+).
 - `npm run pages:dev` — `wrangler pages dev` (serves static site + Functions locally).
 - `npm run probe:x402` — boots `wrangler pages dev`, runs the smoke test, exits 0/1.
 
-## Environment variables (planned, not yet added)
+## Environment variables (added, Phase 2)
 
-Server-only (never `NUXT_PUBLIC_`): `X402_ENABLED`, `X402_NETWORK`, `X402_FACILITATOR_URL`,
-`X402_DEFAULT_RECEIVER`, `X402_LICENSE_MIN_USD`, `X402_SPOTLIGHT_PRICE_USD`,
-`X402_SPOTLIGHT_WINDOW_HOURS`, `X402_SIGNED_DOWNLOAD_TTL_SECONDS`.
+Server-only (never `NUXT_PUBLIC_`), non-secret, in `wrangler.toml [vars]`: `X402_ENABLED`,
+`X402_NETWORK`, `X402_FACILITATOR_URL`, `X402_DEFAULT_RECEIVER`, `X402_LICENSE_MIN_USD`,
+`X402_SPOTLIGHT_PRICE_USD`, `X402_SPOTLIGHT_WINDOW_HOURS`, `X402_SIGNED_DOWNLOAD_TTL_SECONDS`.
+
+Secrets (never in `wrangler.toml`; local `.dev.vars`, deployed `wrangler pages secret put`):
+`STRAPI_URL`, `STRAPI_API_TOKEN` (a Strapi **Full access** API token). See `.dev.vars.example`.
+
+Validated fail-fast at request time by `functions/api/x402/_lib/config.ts` — if x402 is enabled
+and any required value is missing/malformed, the Pages Function returns a `500` with a clear
+`x402_misconfigured` error instead of silently running with broken payment config.
 
 ## Phase 0/0.5 probe (kept as a regression/smoke test)
 

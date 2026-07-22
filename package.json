@@ -9,6 +9,7 @@
     "preview": "nuxt preview",
     "pages:dev": "wrangler pages dev",
     "probe:x402": "node x402-probe/run-pages-probe.mjs",
+    "test": "vitest run",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "vitest": "^4.1.10",
     "wrangler": "^4.86.0"
   }
 }

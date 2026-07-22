@@ -1,7 +1,10 @@
-# Saturnator x402 — Implementation Map (Phase 0 / 0.5)
+# Saturnator x402 — Implementation Map (Phase 0 / 0.5 / 1 / 2)
 
-Read-only audit of the real repository. No product code was modified; the only
-additions are isolated x402 infra (Pages Function + probe + docs) in `saturnator-web`.
+Read-only audit of the real repository (Phase 0), corrected to the actual
+Cloudflare Pages Functions + Strapi split architecture (Phase 0.5), extended with the
+`saturnator-api` domain model (Phase 1), and the shared x402 server module
+(Phase 2). See `docs/x402-phase2-implementation.md` and
+`saturnator-api/docs/x402-phase1-implementation.md` for full phase reports.
 
 ## Finalized architecture (Phase 0.5 decision)
 
@@ -66,7 +69,30 @@ The plan assumes **one** Nuxt/Nitro app that also owns the CMS/database. Reality
 | sample/track entity | `saturnator-api/src/api/track/content-types/track/schema.json` |
 | migration mechanism | `saturnator-api/database/migrations/` + Strapi content-type schemas |
 | runtime config | `saturnator-web/nuxt.config.ts` (`runtimeConfig`) + `saturnator-web/.env` |
-| `server/utils/x402.ts` | `saturnator-web/functions/api/x402/[[route]].ts` + shared helpers under `saturnator-web/functions/` (Pages Functions; **not** Nuxt `server/`) |
-| `server/services/*` | `saturnator-web/functions/` shared modules (net-new; called by the Hono app) |
+| `server/utils/x402.ts` | `saturnator-web/functions/api/x402/_lib/x402-server.ts` (singleton + `onAfterSettle`) |
+| `server/services/x402-offers.ts` | `saturnator-web/functions/api/x402/_lib/offers.ts` (`getLicenseOffer`, `getSponsorshipOffer`) |
+| `server/services/*` (settlement) | `saturnator-web/functions/api/x402/_lib/settlement.ts` + `payment-id.ts` + `settlement-validation.ts` |
 | upload/edit UI | `saturnator-web/pages/upload.vue`, `saturnator-web/stores/upload.ts` |
 | track detail/cards | `saturnator-web/pages/track/[id].vue`, `saturnator-web/pages/index.vue` |
+
+## Phase 1 additions (`saturnator-api`)
+
+| Concern | Real path |
+|---|---|
+| Payout wallet fields | `saturnator-api/src/extensions/users-permissions/content-types/user/schema.json` |
+| Wallet verification nonce | `saturnator-api/src/api/wallet-verification-nonce/**` |
+| Track licensing fields | `saturnator-api/src/api/track/content-types/track/schema.json` (+ `lifecycles.ts`) |
+| License purchase record | `saturnator-api/src/api/license-purchase/**` |
+| Artist sponsorship record | `saturnator-api/src/api/artist-sponsorship/**` |
+| Access-control policies | `saturnator-api/src/policies/{is-api-token,scope-to-owner,enforce-owner}.ts` |
+
+## Phase 2 additions (`saturnator-web`)
+
+| Concern | Real path |
+|---|---|
+| Runtime config (Task 2.1) | `saturnator-web/functions/api/x402/_lib/config.ts` |
+| Resource server singleton (Task 2.2) | `saturnator-web/functions/api/x402/_lib/x402-server.ts` |
+| Dynamic offer resolution (Task 2.3) | `saturnator-web/functions/api/x402/_lib/offers.ts`, `attempt-resolution.ts`, `route-params.ts`, `offer-cache.ts` |
+| Idempotent settlement recording (Task 2.4) | `saturnator-web/functions/api/x402/_lib/settlement.ts`, `payment-id.ts`, `settlement-validation.ts` |
+| Routes | `saturnator-web/functions/api/x402/[[route]].ts` (`GET /health`, `GET /license/:trackId`, `POST /sponsor/:artistId`) |
+| saturnator-api wiring fix (idempotent `create`) | `saturnator-api/src/api/{license-purchase,artist-sponsorship}/controllers/*.ts` |

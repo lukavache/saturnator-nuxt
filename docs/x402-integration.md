@@ -2,6 +2,37 @@
 
 Status: **Phase 0 / 0.5** (Cloudflare Pages Functions runtime validated; no product code integrated).
 
+## Hackathon technical constraints (authoritative)
+
+### Authoritative resources
+- Solana skills / learning: <https://www.solanaskills.com/>
+- Solana Devnet SOL faucet: <https://faucet.solana.com/>
+- Circle test USDC faucet: <https://faucet.circle.com/>
+- Phantom wallet: <https://phantom.com/>
+- Solflare wallet: <https://www.solflare.com/>
+- x402 protocol + facilitator: <https://x402.org/>
+- pay.sh: <https://pay.sh/>
+- Helius (RPC): <https://www.helius.dev/>
+
+### MVP decisions (locked)
+- **Protocol/network:** x402 **v2** on **Solana Devnet USDC** only.
+- **Wallets:** Phantom / Solflare via **Wallet Standard** or the **official x402 Solana paywall**.
+- **Identity:** existing **Strapi authentication** remains the application identity system
+  (the Pages Function validates Strapi JWTs; wallets sign client-side for payment/linking only).
+- **Facilitator:** use the **x402.org facilitator** (`https://x402.org/facilitator`).
+- **RPC:** use **Helius only if a dedicated RPC is required**; do not add it preemptively.
+- **Security:** **never** store, log, or transmit wallet **private keys or seed phrases**.
+  Browser wallets sign client-side; the resource server only needs public addresses + signatures.
+
+### Explicitly OUT OF SCOPE until both core flows are complete
+Do **not** add: Privy, subscriptions, Phoenix, Umbra, NFTs, or any other DeFi features.
+
+### The two core flows (the only Phase 1–4 goals)
+1. **Purchase a sample/track license** through x402 (Devnet USDC → artist wallet, durable
+   idempotent receipt, private download).
+2. **Sponsor an artist** and update the **transparent Spotlight leaderboard** only **after
+   settlement** (labeled `Sponsored`, direct-to-artist payment).
+
 ## Pinned SDK versions (exact, from `saturnator-web/package.json` + lockfile)
 
 | Package | Version | Purpose |

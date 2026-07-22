@@ -10,3 +10,8 @@ STRAPI_URL=http://127.0.0.1:1337
 # Used ONLY server-side, by this Pages Function, to resolve offers and
 # record settlements. Never expose this to the browser.
 STRAPI_API_TOKEN=replace-with-a-real-strapi-full-access-api-token
+
+# Optional: must match saturnator-api LICENSE_DOWNLOAD_SECRET if you mint
+# download tokens from the Pages Function later. Phase 3 mints tokens only
+# inside saturnator-api, so this is unused by the Function today.
+# LICENSE_DOWNLOAD_SECRET=replace-with-shared-secret

@@ -80,7 +80,7 @@ describe('buildOnAfterSettleHook', () => {
 
   it('creates no entitlement/boost when settlement failed', async () => {
     const hook = buildOnAfterSettleHook(CONFIG);
-    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99 }));
+    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99, buyerJwt: 'jwt' }));
 
     await hook(fakeSettleContext({ success: false }));
 
@@ -89,7 +89,7 @@ describe('buildOnAfterSettleHook', () => {
 
   it('records a license purchase once settlement succeeds', async () => {
     const hook = buildOnAfterSettleHook(CONFIG);
-    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99 }));
+    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99, buyerJwt: 'jwt' }));
 
     await hook(fakeSettleContext({ success: true }));
 
@@ -99,7 +99,7 @@ describe('buildOnAfterSettleHook', () => {
 
   it('a duplicate settlement callback for the same attempt calls through twice with the same payment ID (server-side idempotency dedupes to one record)', async () => {
     const hook = buildOnAfterSettleHook(CONFIG);
-    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99 }));
+    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99, buyerJwt: 'jwt' }));
 
     await hook(fakeSettleContext({ success: true }));
     await hook(fakeSettleContext({ success: true }));
@@ -112,7 +112,7 @@ describe('buildOnAfterSettleHook', () => {
 
   it('rejects and alerts on a recipient mismatch without persisting anything', async () => {
     const hook = buildOnAfterSettleHook(CONFIG);
-    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99 }));
+    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99, buyerJwt: 'jwt' }));
 
     await hook(fakeSettleContext({ success: true, payTo: 'AttackerWallet111111111111111111111111111' }));
 
@@ -122,7 +122,7 @@ describe('buildOnAfterSettleHook', () => {
 
   it('rejects a price mismatch without persisting anything', async () => {
     const hook = buildOnAfterSettleHook(CONFIG);
-    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99 }));
+    cacheOffer('attempt-key-1', Promise.resolve({ kind: 'license', offer: LICENSE_OFFER, buyerId: 99, buyerJwt: 'jwt' }));
 
     await hook(fakeSettleContext({ success: true, amount: '1' }));
 

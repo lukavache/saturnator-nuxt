@@ -1,29 +1,36 @@
 // Cloudflare Pages Function: Hono sub-app mounted at /api/x402/*.
-// This is the ONLY server runtime in Saturnator's frontend deployment.
-// Nuxt stays statically generated; Strapi (separate repo) keeps auth/CMS/DB/storage.
-//
-// Phase 2 adds the two real payment routes on top of the Phase 0/0.5
-// smoke-test route:
-//   GET  /api/x402/license/:trackId   — buy a track+sample-pack license
-//   POST /api/x402/sponsor/:artistId  — sponsor an artist (Spotlight boost)
-// Both resolve payTo/price dynamically against saturnator-api (Strapi) and
-// record settlement idempotently via onAfterSettle (see _lib/x402-server.ts).
+// Phase 2: health + license + sponsor payment routes.
+// Phase 3: owned skip-charge, license receipt, download proxy, auth-cookie
+// bridge for the official x402 Solana HTML paywall.
 import { Hono } from 'hono';
 import { handle } from 'hono/cloudflare-pages';
 import { cors } from 'hono/cors';
-import { paymentMiddleware } from '@x402/hono';
-import type { RoutesConfig } from '@x402/core/server';
+import { setCookie } from 'hono/cookie';
+import {
+  paymentMiddlewareFromHTTPServer,
+  x402HTTPResourceServer,
+} from '@x402/hono';
+import type { RoutesConfig, HTTPRequestContext } from '@x402/core/server';
 import type { Network } from '@x402/core/types';
 
 import type { Env } from './_lib/types';
 import { resolveX402Config, X402ConfigError } from './_lib/config';
 import { getX402Server } from './_lib/x402-server';
-import { resolveLicenseAttempt, resolveSponsorshipAttempt, consumeLicenseAttempt, consumeSponsorshipAttempt } from './_lib/attempt-resolution';
+import {
+  resolveLicenseAttempt,
+  resolveSponsorshipAttempt,
+  consumeLicenseAttempt,
+  consumeSponsorshipAttempt,
+} from './_lib/attempt-resolution';
 import { OfferResolutionError } from './_lib/offers';
 import { StrapiRequestError } from './_lib/strapi-client';
 import { SettlementMismatchError } from './_lib/settlement';
+import { extractJwtFromContext, extractJwtFromHono, AUTH_COOKIE } from './_lib/auth';
+import { findOwnedPurchase, findOwnedPurchaseByApiToken } from './_lib/ownership';
+import { buildLicenseReceipt, strapiPurchaseDownloadPath } from './_lib/receipt';
+import { extractRouteParams } from './_lib/route-params';
+import { verifyStrapiJwt } from './_lib/strapi-client';
 
-// Memoize per isolate so we don't rebuild the resource server / re-sync per request.
 let cachedApp: Hono | null = null;
 let cachedForToken: string | null = null;
 
@@ -44,7 +51,6 @@ function buildApp(env: Env): Hono {
 
   const app = new Hono().basePath('/api/x402');
 
-  // Ensure x402 headers are readable by browser JS and survive same-origin/CORS.
   app.use(
     '*',
     cors({
@@ -55,28 +61,40 @@ function buildApp(env: Env): Hono {
     }),
   );
 
-  // Business-rule failures (not found, not licensable, unauthenticated,
-  // wallet not verified, settlement mismatch) get clean, specific responses
-  // instead of a generic 500 — payTo/price hooks and onAfterSettle can only
-  // throw, they can't shape an HTTP response directly.
   app.onError((error, c) => {
     if (error instanceof OfferResolutionError) {
       const status = OFFER_ERROR_STATUS[error.code] ?? 400;
       return c.json({ error: error.code, message: error.message }, status);
     }
     if (error instanceof SettlementMismatchError) {
-      // eslint-disable-next-line no-console
       console.error('[x402] settlement mismatch (possible tampering)', error.message);
       return c.json({ error: 'settlement_mismatch', message: error.message }, 409);
     }
     if (error instanceof StrapiRequestError) {
-      // eslint-disable-next-line no-console
       console.error('[x402] upstream Strapi error', error.status, error.message);
       return c.json({ error: 'upstream_error', message: 'saturnator-api request failed' }, 502);
     }
-    // eslint-disable-next-line no-console
     console.error('[x402] unhandled error', error);
     return c.json({ error: 'internal_error', message: 'Unexpected x402 error' }, 500);
+  });
+
+  // Bridge: SPA stores JWT in localStorage; the official HTML paywall navigates
+  // without an Authorization header. Set a short-lived HttpOnly cookie so the
+  // subsequent GET /license/:id can authenticate the buyer.
+  app.post('/auth-bridge', async (c) => {
+    const jwt = extractJwtFromHono(c);
+    if (!jwt) return c.json({ error: 'unauthenticated', message: 'Bearer token required' }, 401);
+    const user = await verifyStrapiJwt(config, jwt);
+    if (!user) return c.json({ error: 'unauthenticated', message: 'Invalid JWT' }, 401);
+
+    setCookie(c, AUTH_COOKIE, jwt, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/api/x402',
+      maxAge: 10 * 60,
+      secure: c.req.url.startsWith('https://'),
+    });
+    return c.json({ ok: true, userId: user.id });
   });
 
   const routes: RoutesConfig = {
@@ -112,39 +130,107 @@ function buildApp(env: Env): Hono {
     },
   };
 
-  app.use(paymentMiddleware(routes, resourceServer));
+  // Skip charging when the buyer already holds a settled entitlement.
+  const httpServer = new x402HTTPResourceServer(resourceServer, routes).onProtectedRequest(
+    async (context: HTTPRequestContext, routeConfig) => {
+      if (!routeConfig || !String(context.routePattern || '').includes('/license/')) return;
+      const jwt = extractJwtFromContext(context);
+      if (!jwt) return;
+      const { trackId } = extractRouteParams(context.routePattern, context.path);
+      if (!trackId) return;
+      const owned = await findOwnedPurchase(config, jwt, trackId);
+      if (owned) return { grantAccess: true as const };
+    },
+  );
 
-  // Only reached AFTER a valid x402 payment is verified/settled.
+  app.use(paymentMiddlewareFromHTTPServer(httpServer));
+
   app.get('/health', (c) => c.json({ ok: true, message: 'x402 payment verified — access granted' }));
 
   app.get('/license/:trackId', async (c) => {
-    const paymentHeader = c.req.header('x-payment');
+    const trackId = c.req.param('trackId');
+    const jwt = extractJwtFromHono(c);
+    if (!jwt) {
+      return c.json({ error: 'unauthenticated', message: 'Missing Authorization bearer token (Strapi JWT)' }, 401);
+    }
+
+    // Already owned (grantAccess path) — return receipt, never charge again.
+    const owned = await findOwnedPurchase(config, jwt, trackId);
+    if (owned) {
+      return c.json({
+        ok: true,
+        ...buildLicenseReceipt(config, owned, true),
+        message: 'License already owned — no charge.',
+      });
+    }
+
+    // Fresh settlement path.
+    const paymentHeader = c.req.header('x-payment') || c.req.header('PAYMENT-SIGNATURE');
     const attempt = await consumeLicenseAttempt(paymentHeader);
     if (!attempt) {
-      // Extremely unlikely (cache evicted between settle and here within
-      // the same request), but fail closed rather than claim success.
-      return c.json({ error: 'attempt_expired', message: 'Payment settled but offer snapshot expired; contact support' }, 500);
+      return c.json(
+        { error: 'attempt_expired', message: 'Payment settled but offer snapshot expired; contact support' },
+        500,
+      );
     }
-    const { offer } = attempt;
+
+    const purchase =
+      (await findOwnedPurchase(config, attempt.buyerJwt, trackId)) ||
+      (await findOwnedPurchaseByApiToken(config, attempt.buyerId, trackId));
+
+    if (!purchase) {
+      // Settlement recorded asynchronously or briefly delayed — return offer
+      // facts so the UI can poll / for-track without inviting a second payment.
+      return c.json({
+        ok: true,
+        purchaseId: null,
+        assetId: attempt.offer.trackId,
+        assetTitle: attempt.offer.trackTitle,
+        licenseType: attempt.offer.licenseType,
+        licenseVersion: attempt.offer.licenseVersion,
+        amountUsd: attempt.offer.priceUsd,
+        transactionSignature: null,
+        explorerUrl: null,
+        downloadUrl: null,
+        alreadyOwned: false,
+        pending: true,
+        message: 'Payment settled; purchase record is catching up. Retry ownership check shortly.',
+      });
+    }
+
     return c.json({
       ok: true,
-      license: {
-        trackId: offer.trackId,
-        trackTitle: offer.trackTitle,
-        licenseType: offer.licenseType,
-        licenseVersion: offer.licenseVersion,
-        priceUsd: offer.priceUsd,
-      },
-      // Signed download delivery is Phase 3 scope.
-      message: 'License purchased and recorded. Download delivery lands in Phase 3.',
+      ...buildLicenseReceipt(config, purchase, false),
+      message: 'License purchased and recorded.',
     });
+  });
+
+  // Same-origin download proxy: validates buyer JWT, then asks Strapi for
+  // short-lived signed file URLs (never logs those URLs).
+  app.get('/licenses/:purchaseId/download', async (c) => {
+    const jwt = extractJwtFromHono(c);
+    if (!jwt) return c.json({ error: 'unauthenticated', message: 'Authentication required' }, 401);
+
+    const purchaseId = c.req.param('purchaseId');
+    const upstream = await fetch(`${config.strapiUrl}${strapiPurchaseDownloadPath(purchaseId)}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+
+    const body = await upstream.json().catch(() => ({ error: 'upstream_error' }));
+    if (!upstream.ok) {
+      return c.json(body, upstream.status as 400 | 401 | 403 | 404 | 500);
+    }
+    return c.json(body);
   });
 
   app.post('/sponsor/:artistId', async (c) => {
     const paymentHeader = c.req.header('x-payment');
     const attempt = await consumeSponsorshipAttempt(paymentHeader);
     if (!attempt) {
-      return c.json({ error: 'attempt_expired', message: 'Payment settled but offer snapshot expired; contact support' }, 500);
+      return c.json(
+        { error: 'attempt_expired', message: 'Payment settled but offer snapshot expired; contact support' },
+        500,
+      );
     }
     const { offer } = attempt;
     return c.json({
@@ -154,7 +240,6 @@ function buildApp(env: Env): Hono {
         artistUsername: offer.artistUsername,
         priceUsd: offer.priceUsd,
       },
-      // Leaderboard aggregation/display is Phase 4 scope.
       message: 'Sponsorship recorded. Spotlight leaderboard lands in Phase 4.',
     });
   });
@@ -163,8 +248,6 @@ function buildApp(env: Env): Hono {
 }
 
 export const onRequest = (context: { env: Env }) => {
-  // Rebuild if config-relevant env changed (relevant for local dev where
-  // wrangler can hot-reload with different vars) — cheap string compare.
   const tokenKey = `${context.env.X402_NETWORK}:${context.env.STRAPI_URL}`;
   try {
     if (!cachedApp || cachedForToken !== tokenKey) {
@@ -173,9 +256,6 @@ export const onRequest = (context: { env: Env }) => {
     }
   } catch (error) {
     if (error instanceof X402ConfigError) {
-      // Task 2.1: fail loudly and visibly rather than silently serving a
-      // half-broken payment flow.
-      // eslint-disable-next-line no-console
       console.error('[x402] refusing to start: invalid configuration:', error.message);
       return new Response(JSON.stringify({ error: 'x402_misconfigured', message: error.message }), {
         status: 500,

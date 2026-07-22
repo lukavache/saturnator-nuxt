@@ -73,6 +73,15 @@
                       by {{ artistName }}
                     </p>
                   </div>
+
+                  <div class="shrink-0 md:pt-2">
+                    <LicensePurchaseButton
+                      :track-id="String(track.documentId || track.id)"
+                      :price-usd="track.licensePriceUsd"
+                      :x402-enabled="track.x402Enabled"
+                      :track-title="track.title"
+                    />
+                  </div>
                 </div>
 
                 <div class="rounded-lg border-2 border-black bg-saturnator-gray-light p-4">
@@ -213,6 +222,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useTrackStore } from '../../stores/track'
 import { useRoute } from 'vue-router'
+import LicensePurchaseButton from '../../components/payments/LicensePurchaseButton.vue'
 
 // Get track ID from URL since auto-imports aren't working
 const route = useRoute()
@@ -255,6 +265,10 @@ interface Track {
   key?: string;
   description?: string;
   trackStatus?: 'pending' | 'approved' | 'rejected';
+  x402Enabled?: boolean;
+  licensePriceUsd?: string | null;
+  licenseType?: string;
+  licenseVersion?: string;
   createdAt?: string;
   updatedAt?: string;
   users_permissions_user?: {

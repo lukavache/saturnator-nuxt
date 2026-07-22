@@ -96,3 +96,16 @@ The plan assumes **one** Nuxt/Nitro app that also owns the CMS/database. Reality
 | Idempotent settlement recording (Task 2.4) | `saturnator-web/functions/api/x402/_lib/settlement.ts`, `payment-id.ts`, `settlement-validation.ts` |
 | Routes | `saturnator-web/functions/api/x402/[[route]].ts` (`GET /health`, `GET /license/:trackId`, `POST /sponsor/:artistId`) |
 | saturnator-api wiring fix (idempotent `create`) | `saturnator-api/src/api/{license-purchase,artist-sponsorship}/controllers/*.ts` |
+
+## Phase 3 additions
+
+| Concern | Real path |
+|---|---|
+| Owned skip-charge + receipt | `saturnator-web/functions/api/x402/[[route]].ts` (`onProtectedRequest`, receipt builder) |
+| Auth bridge for HTML paywall | `POST /api/x402/auth-bridge` |
+| Download proxy | `GET /api/x402/licenses/:purchaseId/download` |
+| Ownership lookup + gated download | `saturnator-api` `forTrack` / `download` / `downloadFile` |
+| HMAC download tokens | `saturnator-api/src/utils/download-token.ts` |
+| Artist licensing UI | `saturnator-web/pages/upload.vue` |
+| Wallet verify UI | `saturnator-web/pages/settings.vue` |
+| Buyer purchase UI | `components/payments/LicensePurchaseButton.vue`, `PaymentReceiptModal.vue`, `pages/track/[id].vue` |

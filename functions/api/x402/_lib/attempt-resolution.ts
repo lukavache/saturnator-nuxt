@@ -18,11 +18,13 @@ import { getLicenseOffer, getSponsorshipOffer, OfferResolutionError, type Licens
 import { verifyStrapiJwt } from './strapi-client';
 import { cacheOffer, consumeCachedOffer, getCachedOffer } from './offer-cache';
 import { extractRouteParams } from './route-params';
+import { extractJwtFromContext } from './auth';
 
 export interface LicenseAttempt {
   kind: 'license';
   offer: LicenseOffer;
   buyerId: number;
+  buyerJwt: string;
 }
 
 export interface SponsorshipAttempt {
@@ -31,24 +33,20 @@ export interface SponsorshipAttempt {
   sponsorId: number | null;
 }
 
-function bearerToken(context: HTTPRequestContext): string | undefined {
-  const header = context.adapter.getHeader('authorization');
-  if (!header) return undefined;
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match ? match[1] : undefined;
-}
-
-async function requireBuyer(config: X402Config, context: HTTPRequestContext): Promise<number> {
-  const token = bearerToken(context);
+async function requireBuyer(
+  config: X402Config,
+  context: HTTPRequestContext,
+): Promise<{ buyerId: number; buyerJwt: string }> {
+  const token = extractJwtFromContext(context);
   if (!token) throw new OfferResolutionError('unauthenticated', 'Missing Authorization bearer token (Strapi JWT)');
   const user = await verifyStrapiJwt(config, token);
   if (!user) throw new OfferResolutionError('unauthenticated', 'Invalid or expired Strapi JWT');
-  return user.id;
+  return { buyerId: user.id, buyerJwt: token };
 }
 
 async function optionalSponsor(config: X402Config, context: HTTPRequestContext): Promise<number | null> {
-  const token = bearerToken(context);
-  if (!token) return null; // anonymous sponsorship is allowed
+  const token = extractJwtFromContext(context);
+  if (!token) return null;
   const user = await verifyStrapiJwt(config, token);
   return user?.id ?? null;
 }
@@ -68,11 +66,11 @@ export function resolveLicenseAttempt(config: X402Config, context: HTTPRequestCo
 
   const { trackId } = extractRouteParams(context.routePattern, context.path);
   const promise = (async (): Promise<LicenseAttempt> => {
-    const [offer, buyerId] = await Promise.all([
+    const [offer, buyer] = await Promise.all([
       getLicenseOffer(config, trackId),
       requireBuyer(config, context),
     ]);
-    return { kind: 'license', offer, buyerId };
+    return { kind: 'license', offer, buyerId: buyer.buyerId, buyerJwt: buyer.buyerJwt };
   })();
 
   if (key) cacheOffer(key, promise);

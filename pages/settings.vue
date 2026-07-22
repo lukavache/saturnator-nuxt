@@ -113,6 +113,39 @@
           </div>
         </div>
 
+        <!-- Payout Wallet (Solana) -->
+        <div v-if="authStore.isLoggedIn" class="bg-white rounded-lg shadow-sm border-2 border-black overflow-hidden">
+          <div class="px-6 py-4 border-b-2 border-black">
+            <h2 class="text-xl font-semibold text-saturnator-gray-dark">
+              Solana payout wallet
+            </h2>
+          </div>
+          <div class="p-6 space-y-4">
+            <p class="text-sm text-saturnator-gray-medium">
+              Link a Devnet wallet so buyers can pay you directly with x402 USDC. Saturnator never asks for your private key or seed phrase — you only sign a one-time ownership challenge.
+            </p>
+
+            <div v-if="walletStatus.verified" class="rounded-lg border-2 border-black bg-saturnator-gray-light p-4">
+              <p class="text-sm font-bold text-saturnator-gray-dark">Verified</p>
+              <p class="mt-1 font-mono text-xs break-all">{{ walletStatus.address }}</p>
+              <p class="mt-1 text-xs text-saturnator-gray-medium">Network: {{ walletStatus.network }}</p>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+              <button
+                type="button"
+                class="rounded-lg border-2 border-black bg-saturnator-blue-medium px-4 py-2 text-sm font-bold text-white hover:bg-saturnator-blue-dark disabled:opacity-50"
+                :disabled="walletBusy"
+                @click="verifyPayoutWallet"
+              >
+                {{ walletBusy ? 'Waiting for wallet…' : (walletStatus.verified ? 'Re-verify wallet' : 'Connect Phantom / Solflare') }}
+              </button>
+            </div>
+            <p v-if="walletError" class="text-sm font-semibold text-saturnator-red">{{ walletError }}</p>
+            <p v-if="walletSuccess" class="text-sm font-semibold text-green-700">{{ walletSuccess }}</p>
+          </div>
+        </div>
+
         <!-- Not Logged In Message -->
         <div v-else class="bg-white rounded-lg shadow-sm border-2 border-black p-6 text-center">
           <div class="w-16 h-16 bg-saturnator-gray-light rounded-full flex items-center justify-center mx-auto mb-4">
@@ -135,37 +168,104 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import bs58 from 'bs58'
 
-// State
 const isDarkMode = ref(false)
 const updatingProfile = ref(false)
-const changingPassword = ref(false)
 const sendingReset = ref(false)
+const walletBusy = ref(false)
+const walletError = ref('')
+const walletSuccess = ref('')
 
-// User info for profile update
 const userInfo = ref({
   username: '',
   email: ''
 })
 
-// Password change form
-const passwordChange = ref({
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: ''
+const authStore = useAuthStore()
+const client = useStrapiClient()
+
+const walletStatus = computed(() => {
+  const user = authStore.getUser as any
+  return {
+    verified: Boolean(user?.payoutWalletVerifiedAt),
+    address: user?.payoutWalletAddress || '',
+    network: user?.payoutWalletNetwork || 'devnet',
+  }
 })
 
-// Store
-const authStore = useAuthStore()
+function getSolanaProvider(): any {
+  const w = window as any
+  if (w.solana?.isPhantom) return w.solana
+  if (w.solflare?.isSolflare) return w.solflare
+  if (w.solana) return w.solana
+  return null
+}
 
-// Methods
+async function verifyPayoutWallet() {
+  walletError.value = ''
+  walletSuccess.value = ''
+  walletBusy.value = true
+  try {
+    const provider = getSolanaProvider()
+    if (!provider) {
+      throw new Error('No Solana wallet found. Install Phantom or Solflare, then retry.')
+    }
+
+    const connected = await provider.connect()
+    const address =
+      connected?.publicKey?.toString?.() ||
+      provider.publicKey?.toString?.()
+    if (!address) throw new Error('Wallet did not return a public key')
+
+    const challenge = await client<any>('wallet-verification/generate', {
+      method: 'POST',
+      body: { address, network: 'devnet' },
+    })
+
+    const messageBytes = new TextEncoder().encode(challenge.message)
+    const signed = await provider.signMessage(messageBytes, 'utf8')
+    const signatureBytes = signed?.signature || signed
+    const signature = bs58.encode(signatureBytes instanceof Uint8Array ? signatureBytes : new Uint8Array(signatureBytes))
+
+    const result = await client<any>('wallet-verification/verify', {
+      method: 'POST',
+      body: {
+        address,
+        network: 'devnet',
+        nonceRecordId: challenge.nonceRecordId,
+        nonce: challenge.nonce,
+        signature,
+      },
+    })
+
+    // Refresh /me so upload UI sees verifiedAt
+    const me = await client<any>('users/me', { method: 'GET' })
+    if (authStore.user) {
+      authStore.user = {
+        ...authStore.user,
+        ...(me as any),
+        payoutWalletAddress: result.payoutWalletAddress || address,
+        payoutWalletNetwork: result.payoutWalletNetwork || 'devnet',
+        payoutWalletVerifiedAt: (me as any).payoutWalletVerifiedAt || new Date().toISOString(),
+      } as any
+      localStorage.setItem('auth_user', JSON.stringify(authStore.user))
+    }
+
+    walletSuccess.value = 'Payout wallet verified on Solana Devnet.'
+  } catch (error: any) {
+    console.error(error)
+    walletError.value = error?.message || error?.error?.message || 'Wallet verification failed'
+  } finally {
+    walletBusy.value = false
+  }
+}
+
 const toggleDarkMode = () => {
   isDarkMode.value = !isDarkMode.value
-  // Save to localStorage
   localStorage.setItem('darkMode', isDarkMode.value.toString())
-  // Apply theme (you can implement this based on your needs)
   applyTheme()
 }
 
@@ -179,14 +279,9 @@ const applyTheme = () => {
 
 const updateProfile = async () => {
   if (!authStore.getUser) return
-  
   updatingProfile.value = true
   try {
-    // Here you would call your API to update the user profile
     console.log('Updating profile:', userInfo.value)
-    // Example: await authStore.updateProfile(userInfo.value)
-    
-    // For now, just show success
     alert('Profile updated successfully!')
   } catch (error) {
     console.error('Error updating profile:', error)
@@ -201,13 +296,9 @@ const sendPasswordReset = async () => {
     alert('No email address found. Please update your profile first.')
     return
   }
-  
   sendingReset.value = true
   try {
-    // Here you would call your API to send password reset
     console.log('Sending password reset to:', authStore.getUser.email)
-    // Example: await authStore.forgotPassword(authStore.getUser.email)
-    
     alert('Password reset link sent to your email!')
   } catch (error) {
     console.error('Error sending password reset:', error)
@@ -217,20 +308,28 @@ const sendPasswordReset = async () => {
   }
 }
 
-// Initialize
-onMounted(() => {
-  // Load dark mode preference
+onMounted(async () => {
   const savedDarkMode = localStorage.getItem('darkMode')
   if (savedDarkMode) {
     isDarkMode.value = savedDarkMode === 'true'
     applyTheme()
   }
-  
-  // Load user info if logged in
+
+  if (authStore.isLoggedIn) {
+    try {
+      const me = await client<any>('users/me', { method: 'GET' })
+      if (authStore.user) {
+        authStore.user = { ...authStore.user, ...(me as any) } as any
+      }
+    } catch {
+      // ignore — settings still usable
+    }
+  }
+
   if (authStore.getUser) {
     userInfo.value = {
       username: authStore.getUser.username || '',
-      email: authStore.getUser.email || ''
+      email: authStore.getUser.email || '',
     }
   }
 })

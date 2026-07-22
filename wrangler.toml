@@ -23,6 +23,7 @@ X402_LICENSE_MIN_USD = "0.01"
 X402_SPOTLIGHT_PRICE_USD = "0.10"
 X402_SPOTLIGHT_WINDOW_HOURS = "24"
 X402_SIGNED_DOWNLOAD_TTL_SECONDS = "60"
+X402_CORS_ORIGINS = "https://saturnator.pages.dev,http://localhost:3000,http://localhost:8788"
 # STRAPI_URL and STRAPI_API_TOKEN are secrets (never committed here):
 #   local dev  -> .dev.vars (gitignored; see .dev.vars.example)
 #   deployed   -> `wrangler pages secret put STRAPI_URL` / `STRAPI_API_TOKEN`

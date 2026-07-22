@@ -1,75 +1,34 @@
-# Nuxt Minimal Starter
+# Saturnator Web
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Nuxt 3 frontend for Saturnator (static generate → Cloudflare Pages) plus x402 payment
+Pages Functions under `functions/api/x402/*`.
+
+## x402 Devnet demo (hackathon)
+
+Full guide: [`docs/x402-integration.md`](./docs/x402-integration.md) · checklist: [`docs/x402-verification-checklist.md`](./docs/x402-verification-checklist.md).
+
+```bash
+npm install
+# Configure .dev.vars (STRAPI_URL, STRAPI_API_TOKEN) — never commit secrets
+npm run generate
+npm run pages:dev          # site + /api/x402 on :8788
+npm run probe:x402         # unpaid 402 smoke
+npm test
+npm run typecheck
+```
+
+Core flows: buy a track/sample license with Devnet USDC; sponsor an artist onto Spotlight.
+Wallets: Phantom / Solflare on **Devnet**. Never enter private keys into Saturnator.
 
 ## Setup
 
-Make sure to install dependencies:
-
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
 ## Production
 
-Build the application for production:
-
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+npm run generate   # Cloudflare Pages output: .output/public
 ```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.

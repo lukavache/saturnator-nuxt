@@ -1,139 +1,138 @@
-# Saturnator x402 — Integration Notes (Phase 0)
+# Saturnator x402 — Integration Guide
 
-Status: **Phase 0 / 0.5 / 2 complete** (Cloudflare Pages Functions runtime validated; shared x402
-server module — dynamic offers, idempotent settlement — implemented and locally verified end to
-end). See `docs/x402-phase2-implementation.md` for the full Phase 2 report.
+Status: **Phases 0–5 complete** locally (`feature/x402-phase5`). Devnet-only; mainnet not enabled.
 
-## Hackathon technical constraints (authoritative)
+Canonical architecture map: [`x402-implementation-map.md`](./x402-implementation-map.md).  
+Security review: [`x402-security-review.md`](./x402-security-review.md).  
+Manual verification: [`x402-verification-checklist.md`](./x402-verification-checklist.md).
 
-### Authoritative resources
-- Solana skills / learning: <https://www.solanaskills.com/>
-- Solana Devnet SOL faucet: <https://faucet.solana.com/>
-- Circle test USDC faucet: <https://faucet.circle.com/>
-- Phantom wallet: <https://phantom.com/>
-- Solflare wallet: <https://www.solflare.com/>
-- x402 protocol + facilitator: <https://x402.org/>
-- pay.sh: <https://pay.sh/>
-- Helius (RPC): <https://www.helius.dev/>
+## Architecture and request flow
 
-### MVP decisions (locked)
-- **Protocol/network:** x402 **v2** on **Solana Devnet USDC** only.
-- **Wallets:** Phantom / Solflare via **Wallet Standard** or the **official x402 Solana paywall**.
-- **Identity:** existing **Strapi authentication** remains the application identity system
-  (the Pages Function validates Strapi JWTs; wallets sign client-side for payment/linking only).
-- **Facilitator:** use the **x402.org facilitator** (`https://x402.org/facilitator`).
-- **RPC:** use **Helius only if a dedicated RPC is required**; do not add it preemptively.
-- **Security:** **never** store, log, or transmit wallet **private keys or seed phrases**.
-  Browser wallets sign client-side; the resource server only needs public addresses + signatures.
-
-### Explicitly OUT OF SCOPE until both core flows are complete
-Do **not** add: Privy, subscriptions, Phoenix, Umbra, NFTs, or any other DeFi features.
-
-### The two core flows (the only Phase 1–4 goals)
-1. **Purchase a sample/track license** through x402 (Devnet USDC → artist wallet, durable
-   idempotent receipt, private download).
-2. **Sponsor an artist** and update the **transparent Spotlight leaderboard** only **after
-   settlement** (labeled `Sponsored`, direct-to-artist payment).
-
-## Pinned SDK versions (exact, from `saturnator-web/package.json` + lockfile)
-
-| Package | Version | Purpose |
-|---|---|---|
-| `@x402/core` | `2.19.0` | `x402ResourceServer`, `HTTPFacilitatorClient`, types (protocol **v2**) |
-| `@x402/svm` | `2.19.0` | `ExactSvmScheme` (Solana / SVM `exact` scheme) |
-| `@x402/hono` | `2.19.0` | `paymentMiddleware`, Hono adapter (Fetch-native) |
-| `hono` | `4.12.31` | Fetch-native sub-app runtime (Cloudflare/Workers-compatible) |
-
-Source of truth for the API surface (read from the installed packages, not memory):
-- `@x402/hono` README + `dist/cjs/index.d.ts` → `paymentMiddleware(routes, server, paywallConfig?, paywall?, syncFacilitatorOnStart?)`
-- `@x402/core/server` exports `HTTPFacilitatorClient`, `x402ResourceServer`, `x402HTTPResourceServer`
-- `@x402/svm/exact/server` exports `ExactSvmScheme`, `registerExactSvmScheme`
-- Upstream: <https://github.com/x402-foundation/x402> (v2 line). npm dist-tag `latest = 2.19.0` for the `@x402/*` scope.
-
-> Note: the legacy unscoped `x402` / `x402-hono` packages are still at `1.2.0` (v1). We deliberately use the scoped `@x402/*` v2 packages per the plan's non-negotiable guardrail.
-
-## Confirmed capabilities (Phase 0 probe)
-
-- Solana `ExactSvmScheme` registers against `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Devnet). ✔
-- Live test facilitator `https://x402.org/facilitator` returns supported kinds and a `feePayer`. ✔
-- `resourceServer.initialize()` **must** be awaited before serving (otherwise: "Facilitator does not support exact on solana:…"). The Hono middleware also accepts `syncFacilitatorOnStart` (default `true`) to do this automatically.
-- 402 response carries requirements in the **`payment-required`** response header (base64-encoded JSON), body is `{}` for JSON clients.
-
-### Still to confirm in later phases (not required for Phase 0)
-- ~~Dynamic `payTo(context)` / `price(context)` functions resolving the route `:id` against Strapi.~~ **Done, Phase 2.**
-- ~~`x402ResourceServer.onAfterSettle(...)` field shapes (`SettleResultContext`) — inspect pinned types before use.~~ **Done, Phase 2** (`SettleContext = { paymentPayload, requirements, declaredExtensions, transportContext? }`, `SettleResultContext` adds `result: SettleResponse`; `HTTPRequestContext` has no parsed route params, only `path`/`routePattern`/`paymentHeader`/`adapter`).
-- Browser paywall / Wallet Standard signer with Phantom/Solflare — still open, Phase 3+.
-- A real signed Devnet USDC payment completing the paid retry + `onAfterSettle` write end-to-end — still open, Phase 3+ (Phase 2 verified the unpaid 402 path and the settlement-recording code path directly, not a live on-chain settlement).
-
-## Runtime-compatibility decision (FINALIZED — Phase 0.5)
-
-**Chosen: Hono in Cloudflare Pages Functions under `/api/x402/*`, with a static Nuxt site.**
-
-- Nuxt stays statically generated (`nuxt generate` → `.output/public`). No SSR conversion.
-- Hono is **not** mounted in Strapi/Koa. `saturnator-api` is untouched.
-- The Pages Function runs on the Workers runtime with `nodejs_compat` (required: `@x402/*`
-  and Solana web3 use `Buffer`/`crypto`/node builtins).
-- Same-origin routing: `/api/x402/*` is served by the Function; everything else is a static asset.
-
-### Files
-- `functions/api/x402/[[route]].ts` — Hono catch-all app (`basePath('/api/x402')`),
-  `paymentMiddleware` + `ExactSvmScheme`, CORS exposing `payment-required` / `payment-response`.
-- `wrangler.toml` — `pages_build_output_dir=.output/public`, `compatibility_flags=["nodejs_compat"]`,
-  non-secret `[vars]` for x402 config.
-- `x402-probe/probe.mjs` — HTTP assertion (kept as a regression/smoke test).
-- `x402-probe/run-pages-probe.mjs` — boots `wrangler pages dev`, runs the probe, tears down.
-
-### Verified locally (`wrangler pages dev`)
 ```
-[wrangler:info] Ready on http://127.0.0.1:8788
-[wrangler:info] GET /api/x402/health 402 Payment Required
-access-control-expose-headers: payment-required,payment-response,x-payment-response
-payment-required (base64) -> { x402Version:2, accepts:[{ scheme:exact,
-   network:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1, amount:1000,
-   payTo:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU, extra:{ feePayer } }] }
-=== RESULT === ALL PASS
+Browser (Phantom / Solflare)
+   │  static Nuxt assets              │  same-origin /api/x402/*
+   ▼                                  ▼
+Cloudflare Pages (nuxt generate)   Pages Functions (Hono + @x402/* + nodejs_compat)
+                                        │ validate Strapi JWT / auth-bridge cookie
+                                        │ resolve offer (price + payTo) from Strapi
+                                        │ 402 → facilitator settle → onAfterSettle
+                                        ▼
+                                   Strapi (saturnator-api): purchases, sponsorships,
+                                   downloads (HMAC), Spotlight ranking
 ```
-Note: the populated `PAYMENT-RESPONSE` header only appears after a **settled** payment
-(the `payment-verified` path). Phase 0.5 confirms it is registered in
-`Access-Control-Expose-Headers` so it will be readable through Cloudflare; producing a real
-value requires a signed Devnet payment (Phase 3+).
 
-### Cloudflare routing / deployment implications
-- Cloudflare Pages auto-detects the repo-root `functions/` dir and compiles it; the site
-  build output stays `.output/public`. In the Pages project settings: build command
-  `npm run generate`, output dir `.output/public`.
-- `nodejs_compat` must also be set on the deployed Pages project (via `wrangler.toml`
-  committed here, or the dashboard **Settings → Functions → Compatibility flags**).
-- Secrets for later phases (`STRAPI_API_TOKEN`, etc.) go in **Pages → Settings → Environment
-  variables/secrets** or `wrangler pages secret put` — never in `wrangler.toml`.
-- Because `/api/x402/*` is same-origin with the site, the browser wallet flow avoids
-  cross-origin CORS issues with Strapi (which stays on Render).
+### License purchase flow
+1. Buyer signs in (Strapi JWT in localStorage).
+2. SPA `POST /api/x402/auth-bridge` → short-lived HttpOnly cookie.
+3. Navigate to `GET /api/x402/license/:trackId` → unpaid request returns **402** with `payment-required`.
+4. Official x402 HTML paywall / wallet pays **Devnet USDC** to the artist wallet from the server offer.
+5. Facilitator settles → `onAfterSettle` writes idempotent `license-purchase`.
+6. Handler returns receipt (Explorer URL + download proxy). Owned buyers get `grantAccess` (no second charge).
 
-## npm scripts
-- `npm run generate` — static Nuxt build (unchanged).
-- `npm run pages:dev` — `wrangler pages dev` (serves static site + Functions locally).
-- `npm run probe:x402` — boots `wrangler pages dev`, runs the smoke test, exits 0/1.
+### Sponsorship / Spotlight flow
+1. Logged-in fan opens `/spotlight` or track Support CTA.
+2. `POST /api/x402/artists/:artistId/sponsor` (paywall) → settle → sponsorship row.
+3. Receipt includes **post-settlement** rank only. Leaderboard: `GET /api/spotlight` (proxied at `/api/x402/spotlight`).
 
-## Environment variables (added, Phase 2)
+## Pinned package versions
 
-Server-only (never `NUXT_PUBLIC_`), non-secret, in `wrangler.toml [vars]`: `X402_ENABLED`,
-`X402_NETWORK`, `X402_FACILITATOR_URL`, `X402_DEFAULT_RECEIVER`, `X402_LICENSE_MIN_USD`,
-`X402_SPOTLIGHT_PRICE_USD`, `X402_SPOTLIGHT_WINDOW_HOURS`, `X402_SIGNED_DOWNLOAD_TTL_SECONDS`.
+| Package | Version |
+|---|---|
+| `@x402/core` | `2.19.0` |
+| `@x402/svm` | `2.19.0` |
+| `@x402/hono` | `2.19.0` |
+| `hono` | `^4.12.31` |
 
-Secrets (never in `wrangler.toml`; local `.dev.vars`, deployed `wrangler pages secret put`):
-`STRAPI_URL`, `STRAPI_API_TOKEN` (a Strapi **Full access** API token). See `.dev.vars.example`.
+Protocol: **x402 v2** · Network: **Solana Devnet** (`solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`) · Asset: **USDC**.
 
-Validated fail-fast at request time by `functions/api/x402/_lib/config.ts` — if x402 is enabled
-and any required value is missing/malformed, the Pages Function returns a `500` with a clear
-`x402_misconfigured` error instead of silently running with broken payment config.
+## Environment variables
 
-## Phase 0/0.5 probe (kept as a regression/smoke test)
+### Pages Function (non-secret → `wrangler.toml [vars]`)
+`X402_ENABLED`, `X402_NETWORK`, `X402_FACILITATOR_URL`, `X402_DEFAULT_RECEIVER` (health only),
+`X402_LICENSE_MIN_USD`, `X402_SPOTLIGHT_PRICE_USD`, `X402_SPOTLIGHT_WINDOW_HOURS`,
+`X402_SIGNED_DOWNLOAD_TTL_SECONDS`, `X402_CORS_ORIGINS`.
+
+### Pages secrets (`.dev.vars` locally — never commit)
+`STRAPI_URL`, `STRAPI_API_TOKEN`.
+
+### Strapi
+`LICENSE_DOWNLOAD_SECRET` (or fallback `APP_KEYS`), optional `SEED_X402_DEMO=true`,
+`X402_SPOTLIGHT_WINDOW_HOURS`, `X402_SPOTLIGHT_PRICE_USD`.
+
+## Devnet faucet setup
+
+1. Install [Phantom](https://phantom.com/) or [Solflare](https://www.solflare.com/); switch to **Devnet**.
+2. SOL: https://faucet.solana.com/
+3. Test USDC: https://faucet.circle.com/
+4. Facilitator: https://x402.org/facilitator
+
+## Dynamic recipient / price resolution
+
+- **License:** Strapi track must be `x402Enabled`, approved/published, with decimal `licensePriceUsd`.
+  `payTo` = owner’s **verified** `payoutWalletAddress` on Devnet.
+- **Sponsorship:** price from `X402_SPOTLIGHT_PRICE_USD`; `payTo` = artist user’s verified wallet.
+- Browser-supplied price/`payTo` are **ignored**. Settlement is re-checked against the cached offer
+  (`settlement-validation.ts`).
+
+## Idempotency rules
+
+- Unique constraints / lookup on `x402PaymentId` and `transactionSignature`.
+- `decideIdempotentSettlement`: same ids → return existing; conflicting signature → 409.
+- Spotlight ranks **settled** rows only (pending/failed never score).
+
+## Reconcile paid-but-unrecorded settlement
+
+See [`x402-security-review.md`](./x402-security-review.md#reconciliation-paid-but-unrecorded).
+Structured logs include `requestId`, `trackId`/`artistId`, `transactionSignature`, status — never JWTs or full payment headers.
+
+## Local demo seed
 
 ```bash
-cd saturnator-web
-npm run probe:x402                 # boots wrangler pages dev + asserts, self-contained
-# or, against an already-running `npm run pages:dev`:
-node x402-probe/probe.mjs http://127.0.0.1:8788/api/x402/health
+cd saturnator-api
+SEED_X402_DEMO=true npm run develop
 ```
 
-Do **not** delete these files — they are the x402 runtime regression check.
+Creates 3 demo artists, ≥5 preview tracks, one **$0.01** licensable track (`Neon Drift (Demo)`).
+Marked `x402-demo-local`. **No fabricated on-chain txs.** Example login: `demo_nova_pulse` / `DemoLocal!x402`.
+
+## Observability and user-safe errors
+
+- Every `/api/x402/*` response sets `x-request-id`.
+- JSON logs via `functions/api/x402/_lib/logger.ts`.
+- Isolate rate limits on license/sponsor/download/auth-bridge/spotlight.
+- UI maps codes (no wallet, wrong network, insufficient funds, rejected signature, facilitator down, delayed entitlement) via `utils/x402-errors.ts`.
+
+## Mainnet migration checklist (NOT enabled)
+
+- [ ] Change `X402_NETWORK` to mainnet SVM id; USDC mint follows scheme defaults.
+- [ ] Artists re-verify wallets on mainnet (`payoutWalletNetwork=mainnet`).
+- [ ] Replace faucet docs; remove demo seed; rotate API tokens.
+- [ ] Confirm facilitator production URL / fees.
+- [ ] Legal / tax / ToS for paid licenses.
+- [ ] Private object storage ACLs for paid originals.
+- [ ] Edge WAF rate limits + monitoring alerts on `settlement_failed`.
+
+**Do not enable mainnet until the above is complete.**
+
+## Known limitations
+
+- Official HTML paywall (not a custom Wallet Standard Vue modal).
+- One license covers track + sample pack.
+- `/uploads` may remain publicly reachable if URLs leak; downloads are ownership-gated.
+- Isolate rate limits are not a global edge limit.
+- Live wallet E2E is manual (see verification checklist).
+- Organic likes stay separate from Spotlight score.
+
+## Scripts
+
+```bash
+# web
+npm test                 # Vitest
+npm run typecheck        # tsc functions + nuxi typecheck
+npm run probe:x402       # unpaid 402 smoke
+npm run generate         # static build for Pages
+
+# api
+npm test
+npm run typecheck
+```

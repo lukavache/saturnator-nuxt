@@ -19,6 +19,7 @@
 import { computed, ref } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useSpotlightStore } from '../../stores/spotlight'
+import { mapX402UserError } from '../../utils/x402-errors'
 
 const props = defineProps<{
   artistId: string
@@ -49,10 +50,8 @@ async function sponsor() {
   localBusy.value = true
   try {
     await spotlight.startSponsorship(props.artistId)
-    // Navigation to paywall leaves this page; if it returns without navigating,
-    // clear busy on next tick.
   } catch (e: any) {
-    error.value = e?.message || 'Could not start sponsorship'
+    error.value = mapX402UserError(e)
     localBusy.value = false
     spotlight.clearPending()
   }

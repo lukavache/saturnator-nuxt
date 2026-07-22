@@ -122,4 +122,15 @@ The plan assumes **one** Nuxt/Nitro app that also owns the CMS/database. Reality
 | Spotlight SPA | `pages/spotlight.vue`, `stores/spotlight.ts`, `components/spotlight/*` |
 | Track support CTA | `pages/track/[id].vue` + nav link in `layouts/default.vue` |
 
-See `docs/x402-phase4-implementation.md`.
+## Phase 5 additions
+
+| Concern | Real path |
+|---|---|
+| Demo seed (gated) | `saturnator-api/src/utils/seed-x402-demo.ts` + `SEED_X402_DEMO=true` |
+| Structured logs + request id | `functions/api/x402/_lib/logger.ts` |
+| Rate limits | `functions/api/x402/_lib/rate-limit.ts` |
+| User-safe errors | `utils/x402-errors.ts` |
+| CSP / payment headers | `public/_headers` |
+| Final docs | `docs/x402-integration.md`, `docs/x402-security-review.md`, `docs/x402-verification-checklist.md` |
+
+See `docs/x402-phase4-implementation.md` and `docs/x402-integration.md`.

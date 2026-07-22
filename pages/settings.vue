@@ -257,7 +257,8 @@ async function verifyPayoutWallet() {
     walletSuccess.value = 'Payout wallet verified on Solana Devnet.'
   } catch (error: any) {
     console.error(error)
-    walletError.value = error?.message || error?.error?.message || 'Wallet verification failed'
+    const { mapX402UserError } = await import('../utils/x402-errors')
+    walletError.value = mapX402UserError(error)
   } finally {
     walletBusy.value = false
   }

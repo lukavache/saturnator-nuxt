@@ -9,6 +9,13 @@
         Checking license…
       </div>
 
+      <div v-else-if="state === 'pending'" class="space-y-2">
+        <p class="text-sm font-semibold text-saturnator-gray-dark">Confirming payment…</p>
+        <p class="text-xs font-medium text-saturnator-gray-medium">
+          Do not pay again. Rank and ownership update only after settlement is recorded.
+        </p>
+      </div>
+
       <div v-else-if="state === 'owned' && receipt" class="flex flex-wrap items-center gap-3">
         <span class="rounded-lg border-2 border-black bg-white px-3 py-1.5 text-sm font-bold text-saturnator-gray-dark">
           Owned · {{ receipt.licenseType?.replace(/_/g, ' ') }}
@@ -60,6 +67,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useLicenseStore, type LicenseReceipt } from '../stores/license'
+import { mapX402UserError } from '../utils/x402-errors'
 import PaymentReceiptModal from './PaymentReceiptModal.vue'
 
 const props = defineProps<{
@@ -72,7 +80,7 @@ const props = defineProps<{
 const auth = useAuthStore()
 const licenseStore = useLicenseStore()
 
-const state = ref<'loading' | 'preview' | 'owned'>('loading')
+const state = ref<'loading' | 'preview' | 'owned' | 'pending'>('loading')
 const receipt = ref<LicenseReceipt | null>(null)
 const error = ref('')
 const busy = ref(false)
@@ -83,8 +91,9 @@ const licensable = computed(() => Boolean(props.x402Enabled && props.priceUsd))
 
 const buttonLabel = computed(() => {
   if (!auth.isLoggedIn) return 'Sign in to buy license'
+  if (state.value === 'pending') return 'Confirming payment…'
   const price = props.priceUsd || '—'
-  return `Buy license · ${price} USDC`
+  return busy.value ? 'Opening paywall…' : `Buy license · ${price} USDC`
 })
 
 async function refresh() {
@@ -103,6 +112,8 @@ async function refresh() {
   if (owned) {
     receipt.value = owned
     state.value = 'owned'
+  } else if (licenseStore.pendingByTrack[props.trackId]) {
+    state.value = 'pending'
   } else {
     receipt.value = null
     state.value = 'preview'
@@ -119,7 +130,7 @@ async function buy() {
   try {
     await licenseStore.startLicensePurchase(props.trackId)
   } catch (e: any) {
-    error.value = e?.message || 'Could not start payment'
+    error.value = mapX402UserError(e)
     busy.value = false
   }
 }
@@ -141,12 +152,32 @@ async function download() {
       a.remove()
     }
   } catch (e: any) {
-    error.value = e?.message || 'Download failed'
+    error.value = mapX402UserError(e)
   } finally {
     downloading.value = false
   }
 }
 
-onMounted(refresh)
+onMounted(async () => {
+  await refresh()
+  // Returning from paywall: if not yet owned, poll without inviting a second charge.
+  if (auth.isLoggedIn && licensable.value && state.value === 'preview') {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('x402') === 'pending' || params.get('payment') === '1') {
+      state.value = 'pending'
+      error.value = mapX402UserError({ code: 'pending_entitlement' })
+      const owned = await licenseStore.pollOwnershipUntilSettled(props.trackId)
+      if (owned) {
+        receipt.value = owned
+        state.value = 'owned'
+        error.value = ''
+      } else {
+        error.value = mapX402UserError({ code: 'settlement_timeout' })
+        state.value = 'preview'
+      }
+    }
+  }
+})
 watch(() => [props.trackId, props.x402Enabled, props.priceUsd, auth.isLoggedIn], refresh)
+
 </script>

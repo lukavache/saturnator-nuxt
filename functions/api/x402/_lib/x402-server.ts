@@ -11,6 +11,7 @@ import { ExactSvmScheme } from '@x402/svm/exact/server';
 import type { X402Config } from './config';
 import { peekLicenseAttempt, peekSponsorshipAttempt } from './attempt-resolution';
 import { recordLicenseSettlement, recordSponsorshipSettlement, type SettledPaymentFacts } from './settlement';
+import { newRequestId, x402Log } from './logger';
 
 let cachedServer: x402ResourceServer | null = null;
 let cachedForNetwork: string | null = null;
@@ -49,14 +50,21 @@ export function buildOnAfterSettleHook(config: X402Config) {
       try {
         const { offer, buyerId } = await licenseAttempt;
         await recordLicenseSettlement(config, offer, buyerId, settled);
-      } catch (error) {
-        // Task 2.4: never let a persistence failure re-litigate an
-        // already-settled on-chain payment. Report loudly; the MVP
-        // reconciliation path is a manual replay from the logged facts.
-        // eslint-disable-next-line no-console
-        console.error('[x402] failed to record license settlement', {
+        x402Log('info', {
+          requestId: newRequestId(),
+          status: 'settlement_recorded',
+          trackId: offer.trackId,
+          paymentId: settled.transactionSignature,
           transactionSignature: settled.transactionSignature,
-          error: error instanceof Error ? error.message : String(error),
+          message: 'license settlement recorded',
+        });
+      } catch (error) {
+        x402Log('error', {
+          requestId: newRequestId(),
+          status: 'settlement_failed',
+          code: 'license_persist_failed',
+          transactionSignature: settled.transactionSignature,
+          message: error instanceof Error ? error.message : String(error),
         });
       }
       return;
@@ -67,11 +75,21 @@ export function buildOnAfterSettleHook(config: X402Config) {
       try {
         const { offer, sponsorId } = await sponsorshipAttempt;
         await recordSponsorshipSettlement(config, offer, sponsorId, settled);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('[x402] failed to record sponsorship settlement', {
+        x402Log('info', {
+          requestId: newRequestId(),
+          status: 'settlement_recorded',
+          artistId: offer.artistId,
+          paymentId: settled.transactionSignature,
           transactionSignature: settled.transactionSignature,
-          error: error instanceof Error ? error.message : String(error),
+          message: 'sponsorship settlement recorded',
+        });
+      } catch (error) {
+        x402Log('error', {
+          requestId: newRequestId(),
+          status: 'settlement_failed',
+          code: 'sponsorship_persist_failed',
+          transactionSignature: settled.transactionSignature,
+          message: error instanceof Error ? error.message : String(error),
         });
       }
       return;
@@ -79,9 +97,12 @@ export function buildOnAfterSettleHook(config: X402Config) {
 
     // No cached attempt (cache expired/evicted, or health-probe route with
     // no attempt tracking). Nothing to record — logged for visibility.
-    // eslint-disable-next-line no-console
-    console.warn('[x402] onAfterSettle: no cached offer attempt for this payment header', {
+    x402Log('warn', {
+      requestId: newRequestId(),
+      status: 'error',
+      code: 'missing_offer_attempt',
       transactionSignature: settled.transactionSignature,
+      message: 'onAfterSettle: no cached offer attempt for this payment header',
     });
   };
 }

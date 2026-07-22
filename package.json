@@ -10,6 +10,7 @@
     "pages:dev": "wrangler pages dev",
     "probe:x402": "node x402-probe/run-pages-probe.mjs",
     "test": "vitest run",
+    "typecheck": "tsc -p functions/tsconfig.json --noEmit",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {

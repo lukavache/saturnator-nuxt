@@ -10,6 +10,8 @@ export interface Env {
   X402_SPOTLIGHT_PRICE_USD?: string;
   X402_SPOTLIGHT_WINDOW_HOURS?: string;
   X402_SIGNED_DOWNLOAD_TTL_SECONDS?: string;
+  /** Comma-separated allowed CORS origins for payment header exposure. */
+  X402_CORS_ORIGINS?: string;
   // Secrets — set via `wrangler pages secret put`, never in wrangler.toml.
   STRAPI_URL?: string;
   STRAPI_API_TOKEN?: string;

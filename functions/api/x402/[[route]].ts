@@ -31,6 +31,8 @@ import { buildLicenseReceipt, strapiPurchaseDownloadPath } from './_lib/receipt'
 import { extractRouteParams } from './_lib/route-params';
 import { verifyStrapiJwt } from './_lib/strapi-client';
 import { fetchArtistRank, fetchSpotlightBoard } from './_lib/spotlight';
+import { newRequestId, x402Log } from './_lib/logger';
+import { checkRateLimit } from './_lib/rate-limit';
 
 let cachedApp: Hono | null = null;
 let cachedForToken: string | null = null;
@@ -45,6 +47,24 @@ const OFFER_ERROR_STATUS: Record<string, 400 | 401 | 404 | 409> = {
   unauthenticated: 401,
 };
 
+const OFFER_USER_MESSAGES: Record<string, string> = {
+  track_not_found: 'This track is no longer available.',
+  artist_not_found: 'This artist is no longer available for sponsorship.',
+  track_not_licensable: 'Licensing is not enabled for this track.',
+  wallet_not_verified: 'Artist payout wallet is not verified yet.',
+  wallet_network_mismatch: 'Artist wallet is on the wrong Solana network (Devnet required).',
+  unsupported_network: 'Only Solana Devnet USDC is supported.',
+  unauthenticated: 'Sign in required.',
+};
+
+function clientIp(c: { req: { header: (name: string) => string | undefined } }): string {
+  return (
+    c.req.header('cf-connecting-ip') ||
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
+}
+
 function buildApp(env: Env): Hono {
   const config = resolveX402Config(env);
   const resourceServer = getX402Server(config);
@@ -52,31 +72,134 @@ function buildApp(env: Env): Hono {
 
   const app = new Hono().basePath('/api/x402');
 
+  const corsOrigins = (env.X402_CORS_ORIGINS || 'https://saturnator.pages.dev,http://localhost:3000,http://localhost:8788')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  app.use('*', async (c, next) => {
+    const requestId = c.req.header('x-request-id') || newRequestId();
+    c.set('requestId' as never, requestId as never);
+    c.header('x-request-id', requestId);
+    await next();
+  });
+
   app.use(
     '*',
     cors({
-      origin: '*',
+      origin: (origin) => {
+        if (!origin) return corsOrigins[0] || '*';
+        if (corsOrigins.includes('*') || corsOrigins.includes(origin)) return origin;
+        // Same-origin Pages Function calls often omit Origin; allow listed preview hosts.
+        if (/^https:\/\/[a-z0-9-]+\.saturnator\.pages\.dev$/i.test(origin)) return origin;
+        return corsOrigins[0] || origin;
+      },
       allowMethods: ['GET', 'POST', 'OPTIONS'],
-      allowHeaders: ['content-type', 'authorization', 'x-payment', 'payment-signature'],
-      exposeHeaders: ['payment-required', 'payment-response', 'x-payment-response'],
+      allowHeaders: ['content-type', 'authorization', 'x-payment', 'payment-signature', 'x-request-id'],
+      exposeHeaders: ['payment-required', 'payment-response', 'x-payment-response', 'x-request-id'],
     }),
   );
 
+  // Rate limits: offer discovery / sponsorship / download / auth-bridge.
+  app.use('*', async (c, next) => {
+    const path = c.req.path;
+    const method = c.req.method;
+    if (method === 'OPTIONS') return next();
+
+    let limit = 120;
+    let windowMs = 60_000;
+    if (path.includes('/license/') || path.includes('/sponsor')) {
+      limit = 30;
+    } else if (path.includes('/download') || path.includes('/auth-bridge')) {
+      limit = 40;
+    } else if (path.includes('/spotlight')) {
+      limit = 60;
+    }
+
+    const key = `${clientIp(c)}:${method}:${path.split('/').slice(0, 5).join('/')}`;
+    const result = checkRateLimit(key, limit, windowMs);
+    c.header('x-ratelimit-remaining', String(result.remaining));
+    if (!result.allowed) {
+      const requestId = (c.get('requestId' as never) as string) || newRequestId();
+      x402Log('warn', {
+        requestId,
+        status: 'rate_limited',
+        path,
+        httpStatus: 429,
+        message: 'rate limit exceeded',
+      });
+      return c.json(
+        {
+          error: 'rate_limited',
+          message: 'Too many requests. Wait a moment and retry.',
+          requestId,
+        },
+        429,
+      );
+    }
+    return next();
+  });
+
   app.onError((error, c) => {
+    const requestId = (c.get('requestId' as never) as string) || newRequestId();
     if (error instanceof OfferResolutionError) {
       const status = OFFER_ERROR_STATUS[error.code] ?? 400;
-      return c.json({ error: error.code, message: error.message }, status);
+      x402Log('warn', {
+        requestId,
+        status: 'offer_rejected',
+        code: error.code,
+        path: c.req.path,
+        httpStatus: status,
+        message: error.message,
+      });
+      return c.json(
+        {
+          error: error.code,
+          message: OFFER_USER_MESSAGES[error.code] || error.message,
+          requestId,
+        },
+        status,
+      );
     }
     if (error instanceof SettlementMismatchError) {
-      console.error('[x402] settlement mismatch (possible tampering)', error.message);
-      return c.json({ error: 'settlement_mismatch', message: error.message }, 409);
+      x402Log('error', {
+        requestId,
+        status: 'error',
+        code: 'settlement_mismatch',
+        path: c.req.path,
+        httpStatus: 409,
+        message: error.message,
+      });
+      return c.json(
+        {
+          error: 'settlement_mismatch',
+          message:
+            'Payment details did not match the server offer. No entitlement was created — check Explorer before retrying.',
+          requestId,
+        },
+        409,
+      );
     }
     if (error instanceof StrapiRequestError) {
-      console.error('[x402] upstream Strapi error', error.status, error.message);
-      return c.json({ error: 'upstream_error', message: 'saturnator-api request failed' }, 502);
+      x402Log('error', {
+        requestId,
+        status: 'error',
+        code: 'upstream_error',
+        httpStatus: 502,
+        message: error.message,
+        path: c.req.path,
+      });
+      return c.json({ error: 'upstream_error', message: 'Backend temporarily unavailable. Retry shortly.', requestId }, 502);
     }
-    console.error('[x402] unhandled error', error);
-    return c.json({ error: 'internal_error', message: 'Unexpected x402 error' }, 500);
+    x402Log('error', {
+      requestId,
+      status: 'error',
+      code: 'internal_error',
+      path: c.req.path,
+      httpStatus: 500,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ error: 'internal_error', message: 'Unexpected payment error. Do not pay again until you check ownership.', requestId }, 500);
   });
 
   // Bridge: SPA stores JWT in localStorage; the official HTML paywall navigates
@@ -206,7 +329,8 @@ function buildApp(env: Env): Hono {
         downloadUrl: null,
         alreadyOwned: false,
         pending: true,
-        message: 'Payment settled; purchase record is catching up. Retry ownership check shortly.',
+        message:
+          'Payment settled on-chain; entitlement is still writing. Poll ownership — do not pay again.',
       });
     }
 

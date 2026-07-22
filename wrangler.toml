@@ -1,0 +1,18 @@
+# Cloudflare Pages config for Saturnator (static Nuxt + Pages Functions).
+# The Nuxt site is STILL statically generated (`nuxt generate` -> .output/public).
+# Server logic lives ONLY in Pages Functions under ./functions (Hono, /api/x402/*).
+name = "saturnator"
+pages_build_output_dir = ".output/public"
+compatibility_date = "2024-11-01"
+# nodejs_compat is required: @x402/* + @solana web3 use Buffer/crypto/node builtins.
+compatibility_flags = ["nodejs_compat"]
+
+# Non-secret x402 runtime config exposed to the Pages Function via `env`.
+# Secrets (e.g. STRAPI_API_TOKEN) must be set with `wrangler pages secret put`,
+# never committed here.
+[vars]
+X402_ENABLED = "true"
+X402_NETWORK = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+X402_FACILITATOR_URL = "https://x402.org/facilitator"
+# Devnet test receiver (public wallet address; NOT a secret). Valid base58 pubkey.
+X402_DEFAULT_RECEIVER = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"

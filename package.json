@@ -7,6 +7,8 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "pages:dev": "wrangler pages dev",
+    "probe:x402": "node x402-probe/run-pages-probe.mjs",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
@@ -15,10 +17,17 @@
     "@pinia/nuxt": "^0.11.1",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.10",
+    "@x402/core": "2.19.0",
+    "@x402/hono": "2.19.0",
+    "@x402/svm": "2.19.0",
+    "hono": "^4.12.31",
     "nuxt": "^3.17.5",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.3.0",
     "vue": "^3.5.16",
     "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.86.0"
   }
 }

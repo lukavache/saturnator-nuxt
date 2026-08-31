@@ -1,16 +1,21 @@
 export default defineNuxtRouteMiddleware(async () => {
+  // Admin gate is client-only (token lives in localStorage / cookie).
+  if (import.meta.server) return
+
   const authStore = useAuthStore()
+
+  // Ensure Pinia + @nuxtjs/strapi share the same JWT before any check.
+  await authStore.initializeAuth()
 
   if (!authStore.isLoggedIn) {
     return navigateTo('/login')
   }
 
-  // Refresh role from API (ADMIN_EMAILS elevation happens server-side on /users/me)
-  if (process.client && !authStore.isAdmin) {
+  if (!authStore.isAdmin) {
     try {
-      await authStore.fetchUser()
+      await authStore.fetchUser({ logoutOnError: false })
     } catch {
-      // ignore
+      // ignore — fall through to redirect
     }
   }
 

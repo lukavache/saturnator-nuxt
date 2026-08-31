@@ -20,13 +20,29 @@ interface AuthState {
   user: User | null
   token: string | null
   loading: boolean
+  initialized: boolean
+}
+
+function unwrapUser(user: unknown): User | null {
+  if (!user) return null
+  const raw = (user as any)?.value !== undefined ? (user as any).value : user
+  if (!raw || typeof raw !== 'object') return null
+  return raw as User
+}
+
+function isAdminUser(user: User | null) {
+  if (!user) return false
+  if (user.role?.name === 'Admin' || user.role?.type === 'admin') return true
+  // Fallback: ADMIN_EMAILS elevation may not be in a stale cached user yet
+  return false
 }
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
     user: null,
-    token: storage.get('auth_token') || null,
-    loading: false
+    token: null,
+    loading: false,
+    initialized: false,
   }),
 
   getters: {
@@ -34,27 +50,36 @@ export const useAuthStore = defineStore('auth', {
     getToken: (state) => state.token,
     isLoggedIn: (state) => !!state.token,
     isLoading: (state) => state.loading,
-    isAdmin: (state) =>
-      state.user?.role?.name === 'Admin' || state.user?.role?.type === 'admin'
+    isAdmin: (state) => isAdminUser(state.user),
   },
 
   actions: {
+    /** Keep @nuxtjs/strapi cookie token in sync with our localStorage JWT. */
+    syncStrapiToken(token: string | null = this.token) {
+      if (!process.client) return
+      try {
+        const { setToken } = useStrapiAuth()
+        setToken(token)
+      } catch (error) {
+        console.error('Failed to sync Strapi token', error)
+      }
+    },
+
     async login(credentials: { identifier: string; password: string }) {
       this.loading = true
       try {
         const { login } = useStrapiAuth()
         const response = await login(credentials)
-        
-        const userData = response.user?.value || response.user
-        if (userData) {
-          this.user = userData as User
-        }
+
+        const userData = unwrapUser(response.user)
+        this.user = userData
         this.token = response.jwt
-        
-        // Store in localStorage
+        this.initialized = true
+
         storage.set('auth_token', response.jwt)
-        storage.set('auth_user', JSON.stringify(response.user))
-        
+        storage.set('auth_user', JSON.stringify(userData))
+        this.syncStrapiToken(response.jwt)
+
         return response
       } catch (error) {
         console.error('Login error:', error)
@@ -69,13 +94,6 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { register } = useStrapiAuth()
         const response = await register(userData)
-        
-        // Don't automatically log in - wait for email confirmation
-        // await this.login({
-        //   identifier: userData.email,
-        //   password: userData.password
-        // })
-        
         return response
       } catch (error) {
         console.error('Registration error:', error)
@@ -94,13 +112,12 @@ export const useAuthStore = defineStore('auth', {
           {
             method: 'GET',
             redirect: 'manual',
-          }
-        );
-        if(strapiResponse.status === 400) {
+          },
+        )
+        if (strapiResponse.status === 400) {
           throw new Error(strapiResponse.statusText)
-        } else {
-          return strapiResponse
         }
+        return strapiResponse
       } catch (error) {
         console.error('Email confirmation error:', error)
         throw error
@@ -127,62 +144,88 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { logout } = useStrapiAuth()
         await logout()
-        return true
       } catch (error) {
         console.error('Logout error:', error)
-        return false
       } finally {
         this.user = null
         this.token = null
+        this.syncStrapiToken(null)
         storage.removeItems(['auth_token', 'auth_user'])
       }
+      return true
     },
 
-    async fetchUser() {
+    async fetchUser(opts: { logoutOnError?: boolean } = {}) {
+      const logoutOnError = opts.logoutOnError !== false
       try {
-        const { fetchUser } = useStrapiAuth()
-        const user = await fetchUser()
-        
-        if (user) {
-          this.user = user
-          storage.set('auth_user', JSON.stringify(user))
+        this.syncStrapiToken(this.token || storage.get('auth_token'))
+
+        // Prefer a direct call so we always send our Bearer token.
+        const config = useRuntimeConfig()
+        const token = this.token || storage.get('auth_token')
+        if (!token) return null
+
+        const res = await fetch(`${config.public.apiBase}/api/users/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) {
+          throw new Error(`users/me failed: ${res.status}`)
         }
-        
+        const user = (await res.json()) as User
+        this.user = user
+        storage.set('auth_user', JSON.stringify(user))
         return user
       } catch (error) {
         console.error('Fetch user error:', error)
-        this.logout()
+        if (logoutOnError) {
+          await this.logout()
+        }
         return null
       }
     },
 
     async initializeAuth() {
-      // Always try to initialize, not just on client
+      if (!process.client) {
+        this.initialized = true
+        return
+      }
+
       const token = storage.get('auth_token')
       const userData = storage.get('auth_user')
-      
-      if (token && userData) {
-        try {
-          this.token = token
-          this.user = JSON.parse(userData) as User
-          
-          // Only fetch user on client side to avoid SSR issues
-          if (process.client) {
-            await this.fetchUser()
+
+      if (token) {
+        this.token = token
+        this.syncStrapiToken(token)
+        if (userData) {
+          try {
+            this.user = JSON.parse(userData) as User
+          } catch {
+            this.user = null
           }
-        } catch (error) {
-          console.error('Token validation error:', error)
-          this.logout()
         }
+
+        // Refresh role quietly; don't wipe session on transient errors.
+        await this.fetchUser({ logoutOnError: false })
       }
+
+      this.initialized = true
     },
 
     async forgotPassword(email: string) {
       this.loading = true
       try {
-        const { forgotPassword } = useStrapiAuth()
-        const response = await forgotPassword({ email })
-        return response
+        // Avoid useStrapiAuth().forgotPassword — it clears the JWT cookie.
+        const config = useRuntimeConfig()
+        const res = await fetch(`${config.public.apiBase}/api/auth/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error((body as any)?.error?.message || 'Failed to send reset email')
+        }
+        return true
       } catch (error) {
         console.error('Forgot password error:', error)
         throw error
@@ -198,8 +241,16 @@ export const useAuthStore = defineStore('auth', {
         const response = await resetPassword({
           password,
           passwordConfirmation,
-          code
+          code,
         })
+        const userData = unwrapUser(response.user)
+        if (response.jwt) {
+          this.token = response.jwt
+          this.user = userData
+          storage.set('auth_token', response.jwt)
+          storage.set('auth_user', JSON.stringify(userData))
+          this.syncStrapiToken(response.jwt)
+        }
         return response
       } catch (error) {
         console.error('Reset password error:', error)
@@ -207,6 +258,6 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.loading = false
       }
-    }
-  }
+    },
+  },
 })

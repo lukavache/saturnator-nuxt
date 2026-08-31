@@ -54,6 +54,12 @@ export default defineNuxtConfig({
   routeRules: {
     '/upload': {
       ssr: false
+    },
+    '/admin': {
+      ssr: false
+    },
+    '/admin/**': {
+      ssr: false
     }
   },
 })

@@ -190,11 +190,12 @@ const actionMenuRef = ref<HTMLElement>()
 // Stores
 const trackStore = useTrackStore()
 const authStore = useAuthStore()
+const config = useRuntimeConfig()
 
 // Methods
 const assetUrl = (url?: string) => {
   if (!url) return ''
-  return url.startsWith('http') ? url : `http://localhost:1337${url}`
+  return url.startsWith('http') ? url : `${config.public.apiBase}${url}`
 }
 
 const formatGenres = (genres: any): string => {

@@ -48,15 +48,6 @@
                       @update:like-count="updateLikeCount"
                     />
                   </div>
-                  <div v-if="artistUserId" class="mt-4 border-t-2 border-black pt-4">
-                    <p class="mb-2 text-xs font-bold uppercase tracking-wide text-saturnator-gray-medium">
-                      Support on Spotlight
-                    </p>
-                    <SponsorButton :artist-id="String(artistUserId)" price-usd="0.10" />
-                    <NuxtLink to="/spotlight" class="mt-2 inline-block text-xs font-semibold text-saturnator-blue-medium underline">
-                      View Spotlight leaderboard
-                    </NuxtLink>
-                  </div>
                 </div>
               </div>
             </aside>
@@ -80,15 +71,6 @@
                   <p class="mt-3 text-lg font-semibold text-saturnator-gray-medium">
                     by {{ artistName }}
                   </p>
-                </div>
-
-                <div class="w-full max-w-xl">
-                  <LicensePurchaseButton
-                    :track-id="String(track.documentId || track.id)"
-                    :price-usd="track.licensePriceUsd"
-                    :x402-enabled="track.x402Enabled"
-                    :track-title="track.title"
-                  />
                 </div>
 
                 <div class="rounded-lg border-2 border-black bg-saturnator-gray-light p-4">
@@ -229,12 +211,8 @@
 import { computed, ref, onMounted } from 'vue'
 import { useTrackStore } from '../../stores/track'
 import { useRoute } from 'vue-router'
-import LicensePurchaseButton from '../../components/payments/LicensePurchaseButton.vue'
-import SponsorButton from '../../components/spotlight/SponsorButton.vue'
 
-// Get track ID from URL since auto-imports aren't working
 const route = useRoute()
-const trackId = route.params.id as string
 const config = useRuntimeConfig()
 
 const assetUrl = (url?: string) => {
@@ -273,10 +251,6 @@ interface Track {
   key?: string;
   description?: string;
   trackStatus?: 'pending' | 'approved' | 'rejected';
-  x402Enabled?: boolean;
-  licensePriceUsd?: string | null;
-  licenseType?: string;
-  licenseVersion?: string;
   createdAt?: string;
   updatedAt?: string;
   users_permissions_user?: {
@@ -299,10 +273,6 @@ const likeCount = ref(0)
 
 const artistName = computed(() => {
   return track.value?.username || track.value?.users_permissions_user?.username || 'Unknown Artist'
-})
-
-const artistUserId = computed(() => {
-  return track.value?.users_permissions_user?.id ?? null
 })
 
 const coverUrl = computed(() => {

@@ -216,63 +216,6 @@
               </div>
             </div>
 
-            <!-- x402 Licensing (Solana USDC) -->
-            <div class="rounded-lg border-2 border-black bg-saturnator-gray-light p-6 space-y-4">
-              <div>
-                <h3 class="text-lg font-bold text-saturnator-gray-dark">Sell licenses with Solana USDC</h3>
-                <p class="mt-1 text-sm text-saturnator-gray-medium">
-                  You keep copyright. The buyer receives the displayed non-exclusive license for this track and its attached sample pack.
-                </p>
-              </div>
-
-              <label class="flex items-start gap-3 cursor-pointer">
-                <input
-                  v-model="form.x402Enabled"
-                  type="checkbox"
-                  class="mt-1 h-4 w-4 border-2 border-black rounded"
-                />
-                <span class="text-sm font-semibold text-saturnator-gray-dark">
-                  Enable x402 licensing on Solana Devnet
-                </span>
-              </label>
-
-              <div v-if="form.x402Enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
-                    License price (USDC)
-                  </label>
-                  <input
-                    v-model="form.licensePriceUsd"
-                    type="text"
-                    inputmode="decimal"
-                    pattern="^\d{1,5}\.\d{2}$"
-                    placeholder="0.10"
-                    required
-                    class="w-full px-4 py-3 border-2 border-black rounded-lg bg-white focus:ring-2 focus:ring-saturnator-blue-medium"
-                  />
-                  <p class="mt-1 text-xs text-saturnator-gray-medium">Format: 0.01 – 100.00 (two decimals)</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-semibold text-saturnator-gray-dark mb-2">
-                    License type
-                  </label>
-                  <select
-                    v-model="form.licenseType"
-                    class="w-full px-4 py-3 border-2 border-black rounded-lg bg-white focus:ring-2 focus:ring-saturnator-blue-medium"
-                  >
-                    <option value="non_exclusive_commercial">Non-exclusive commercial</option>
-                    <option value="non_exclusive_personal">Non-exclusive personal</option>
-                  </select>
-                </div>
-              </div>
-
-              <p v-if="form.x402Enabled && !walletVerified" class="text-sm font-semibold text-saturnator-red">
-                Verify a Solana payout wallet in
-                <NuxtLink to="/settings" class="underline">Settings</NuxtLink>
-                before enabling licensing. Upload will be rejected without one.
-              </p>
-            </div>
-
             <!-- Messages -->
             <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
               <p class="text-red-600 text-sm">{{ error }}</p>
@@ -303,7 +246,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref } from 'vue'
 
 // SEO
 definePageMeta({
@@ -356,12 +299,7 @@ const form = ref({
   audioFile: null as File | null,
   samples: [] as File[],
   coverImage: null as File | null,
-  x402Enabled: false,
-  licensePriceUsd: '0.10',
-  licenseType: 'non_exclusive_commercial' as 'non_exclusive_commercial' | 'non_exclusive_personal',
 })
-
-const walletVerified = computed(() => Boolean((authStore.getUser as any)?.payoutWalletVerifiedAt))
 
 const loading = ref(false)
 const error = ref('')
@@ -437,19 +375,6 @@ const handleSubmit = async () => {
       key: form.value.key,
       trackStatus: 'pending',
       username: authStore.getUser?.username,
-      x402Enabled: form.value.x402Enabled,
-    }
-
-    if (form.value.x402Enabled) {
-      if (!walletVerified.value) {
-        throw new Error('Verify a Solana payout wallet in Settings before enabling licensing.')
-      }
-      if (!/^\d{1,5}\.\d{2}$/.test(form.value.licensePriceUsd)) {
-        throw new Error('License price must look like 0.10 (two decimal places).')
-      }
-      trackData.licensePriceUsd = form.value.licensePriceUsd
-      trackData.licenseType = form.value.licenseType
-      trackData.licenseVersion = 'saturnator-license-v1'
     }
 
     // Add file IDs to the track data
@@ -486,9 +411,6 @@ const handleSubmit = async () => {
       audioFile: null,
       samples: [],
       coverImage: null,
-      x402Enabled: false,
-      licensePriceUsd: '0.10',
-      licenseType: 'non_exclusive_commercial',
     }
 
     if (audioFileInput.value) audioFileInput.value.value = ''

@@ -2,8 +2,7 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-05-15',
   devtools: { enabled: true },
-  
-  // App configuration
+
   app: {
     head: {
       link: [
@@ -11,17 +10,17 @@ export default defineNuxtConfig({
       ]
     }
   },
-  
-  // Modules
+
   modules: [
     '@nuxtjs/strapi',
     '@pinia/nuxt',
     '@nuxtjs/tailwindcss'
   ],
-  
-  // Strapi configuration
+
+  // Points at Cloudflare Workers API (Strapi-compatible /api surface).
+  // Override with STRAPI_URL / NUXT_PUBLIC_API_BASE.
   strapi: {
-    url: process.env.STRAPI_URL || 'http://localhost:1337',
+    url: process.env.STRAPI_URL || process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8787',
     prefix: '/api',
     version: 'v5',
     auth: { populate: ["role"] },
@@ -30,31 +29,24 @@ export default defineNuxtConfig({
       sameSite: 'lax',
     },
   },
-  
-  // Pinia configuration
+
   pinia: {
     autoImports: ['defineStore', 'acceptHMRUpdate']
   },
-  
-  // Runtime config for environment variables
+
   runtimeConfig: {
     public: {
-      apiBase: process.env.STRAPI_URL || 'http://localhost:1337',
-      // Empty = same-origin (Cloudflare Pages). Local Nuxt cannot host Functions,
-      // so default to wrangler pages dev. Client code rewrites hostname to match
-      // the page (localhost vs 127.0.0.1). Override with NUXT_PUBLIC_X402_BASE.
-      x402Base:
-        process.env.NUXT_PUBLIC_X402_BASE ||
-        (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8788'),
+      apiBase:
+        process.env.STRAPI_URL ||
+        process.env.NUXT_PUBLIC_API_BASE ||
+        'http://localhost:8787',
     },
   },
-  
-  // Auto-imports
+
   imports: {
     dirs: ['stores']
   },
-  
-  // Build configuration
+
   build: {
     transpile: ['@nuxtjs/strapi']
   },

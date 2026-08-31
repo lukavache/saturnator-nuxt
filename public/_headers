@@ -1,9 +1,4 @@
-# Cloudflare Pages `_headers` (Phase 5)
-
-/api/x402/*
-  Access-Control-Expose-Headers: payment-required, payment-response, x-payment-response, x-request-id
-
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; connect-src 'self' https://x402.org https://*.x402.org https://saturnator-strapi.onrender.com http://localhost:1337 https://*.helius-rpc.com wss://*.helius-rpc.com https://api.devnet.solana.com; img-src 'self' data: blob: https://saturnator-strapi.onrender.com http://localhost:1337; media-src 'self' blob: https://saturnator-strapi.onrender.com http://localhost:1337; frame-src 'self' https://x402.org; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; connect-src 'self' https://*.workers.dev https://api.saturnator.com http://localhost:8787 http://127.0.0.1:8787; img-src 'self' data: blob: https://imagedelivery.net https://*.r2.dev https://*.workers.dev http://localhost:8787 http://127.0.0.1:8787; media-src 'self' blob: https://*.r2.dev https://*.workers.dev http://localhost:8787 http://127.0.0.1:8787; frame-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'

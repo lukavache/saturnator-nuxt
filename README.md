@@ -1,37 +1,22 @@
 # Saturnator Web
 
-Nuxt 3 frontend for Saturnator (static generate → Cloudflare Pages) plus x402 payment
-Pages Functions under `functions/api/x402/*`.
+Nuxt 3 frontend for Saturnator. Static generate → Cloudflare Pages.
 
-## x402 Devnet demo (hackathon)
-
-Full guide: [`docs/x402-integration.md`](./docs/x402-integration.md) · checklist: [`docs/x402-verification-checklist.md`](./docs/x402-verification-checklist.md).
+## Local development
 
 ```bash
-npm install
-# Configure .dev.vars (STRAPI_URL, STRAPI_API_TOKEN) — never commit secrets
+# Terminal 1 — Cloudflare Workers API (see ../saturnator-workers)
+cd ../saturnator-workers && npm run dev
 
-# Local UI + payments (two processes):
-npm run pages:dev          # x402 Functions on :8788 (required for Buy / Spotlight pay)
-npm run dev                # Nuxt UI on :3000 (calls :8788 via NUXT_PUBLIC_X402_BASE)
-
-npm run probe:x402         # unpaid 402 smoke
-npm test
-npm run typecheck
+# Terminal 2 — Nuxt UI
+STRAPI_URL=http://localhost:8787 npm run dev
 ```
 
-Core flows: buy a track/sample license with Devnet USDC; sponsor an artist onto Spotlight.
-Wallets: Phantom / Solflare on **Devnet**. Never enter private keys into Saturnator.
+Set `STRAPI_URL` / `NUXT_PUBLIC_API_BASE` to your deployed Workers URL in production.
 
-## Setup
-
-```bash
-npm install
-npm run dev
-```
-
-## Production
+## Deploy
 
 ```bash
-npm run generate   # Cloudflare Pages output: .output/public
+npm run generate
+# Upload .output/public to Cloudflare Pages
 ```

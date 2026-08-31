@@ -10,9 +10,6 @@ interface User {
   blocked?: boolean
   createdAt?: string
   updatedAt?: string
-  payoutWalletAddress?: string | null
-  payoutWalletNetwork?: string | null
-  payoutWalletVerifiedAt?: string | null
   role?: {
     name: string
     type: string

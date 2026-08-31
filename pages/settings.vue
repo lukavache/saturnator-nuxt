@@ -185,7 +185,7 @@ const sendPasswordReset = async () => {
   }
   sendingReset.value = true
   try {
-    console.log('Sending password reset to:', authStore.getUser.email)
+    await authStore.forgotPassword(authStore.getUser.email)
     alert('Password reset link sent to your email!')
   } catch (error) {
     console.error('Error sending password reset:', error)

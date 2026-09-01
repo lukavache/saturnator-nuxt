@@ -14,14 +14,29 @@ type AdminTrack = {
   users_permissions_user?: { username?: string } | null
 }
 
+type AdminUser = {
+  id: number
+  documentId?: string
+  username?: string
+  email?: string
+  confirmed?: boolean
+  blocked?: boolean
+  createdAt?: string
+  role?: { name?: string; type?: string }
+}
+
 export const useAdminStore = defineStore('Admin', () => {
   const config = useRuntimeConfig()
   const auth = useAuthStore()
 
+  const section = ref<'tracks' | 'users'>('tracks')
   const tracks = ref<AdminTrack[]>([])
+  const users = ref<AdminUser[]>([])
   const loading = ref(false)
   const error = ref('')
   const statusFilter = ref<'pending' | 'approved' | 'rejected' | 'all'>('pending')
+  const userFilter = ref<'all' | 'confirmed' | 'unconfirmed' | 'blocked' | 'admin'>('all')
+  const userQuery = ref('')
 
   const apiFetch = async <T>(path: string, opts: RequestInit = {}) => {
     const token = auth.getToken
@@ -45,6 +60,7 @@ export const useAdminStore = defineStore('Admin', () => {
   }
 
   const loadTracks = async (status = statusFilter.value) => {
+    section.value = 'tracks'
     loading.value = true
     error.value = ''
     statusFilter.value = status
@@ -70,13 +86,56 @@ export const useAdminStore = defineStore('Admin', () => {
     await loadTracks(statusFilter.value)
   }
 
+  const loadUsers = async (
+    filter = userFilter.value,
+    q = userQuery.value,
+  ) => {
+    section.value = 'users'
+    loading.value = true
+    error.value = ''
+    userFilter.value = filter
+    userQuery.value = q
+    try {
+      const params = new URLSearchParams({
+        filter,
+        'pagination[pageSize]': '100',
+      })
+      if (q.trim()) params.set('q', q.trim())
+      const res = await apiFetch<{ data: AdminUser[] }>(`/api/admin/users?${params}`)
+      users.value = res.data || []
+    } catch (err: any) {
+      error.value = err.message || 'Failed to load users'
+      users.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const updateUser = async (
+    user: AdminUser,
+    patch: { blocked?: boolean; confirmed?: boolean; role?: 'admin' | 'authenticated' },
+  ) => {
+    const id = user.documentId || user.id
+    await apiFetch(`/api/admin/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+    await loadUsers(userFilter.value, userQuery.value)
+  }
+
   return {
+    section,
     tracks,
+    users,
     loading,
     error,
     statusFilter,
+    userFilter,
+    userQuery,
     loadTracks,
     setStatus,
+    loadUsers,
+    updateUser,
   }
 })
 
